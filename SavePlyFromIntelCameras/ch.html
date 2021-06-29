@@ -208,23 +208,6 @@ auto color = frames.get_color_frame();</code>
 
 						<a href="#" class="image featured"><img src="images/pcexample.png" alt="" /></a>
 
-						<pre>
-<code class="language-cpp">if (ifColor == 1) {
-    // Map the point cloud to the given color frame
-    pc.map_to(color);
-    // Generate the point cloud
-    rs2::points points = pc.calculate(depth);
-    // Export the point cloud to a PLY file with colors
-    points.export_to_ply(ply_file.str(), color);
-} else if (ifColor == 0) {
-    // Generate the point cloud
-    rs2::points points = pc.calculate(depth);
-    // Export the point cloud to a PLY file without colors
-    points.export_to_ply_notexture(ply_file.str());
-} </code>
-</pre>
-
-
 
 					</div>
 				</section>
