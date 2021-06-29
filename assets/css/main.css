@@ -2247,8 +2247,10 @@ input, select, textarea {
 			}
 
 			#main > section.one {
+				background-size:cover ;
 				background-color: #81918E;
-				background-image: url("../../images/banner.jpg");
+				background-position: center;
+				background-image: url("../../images/356-3562194_arknights-penguin-logistics.png");
 			}
 
 			#main > section.two {
@@ -2260,8 +2262,21 @@ input, select, textarea {
 			}
 
 			#main > section.four {
-				background-color: #e8edec;
+				background-color: #f5fafa;
 			}
+
+#main > section.five {
+	background-color: #ecf1f1;
+}
+#main > section.six {
+	background-color: #f5fafa;
+}
+#main > section.seven {
+	background-color: #ecf1f1;
+}
+#main > section.eight {
+	background-color: #f5fafa;
+}
 
 /* Wide */
 

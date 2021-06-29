@@ -2329,7 +2329,7 @@ Prism.languages.py = Prism.languages.python;
 			return;
 		}
 
-		// Remove the class 'line-numbers' from the <code>
+		// Remove the class 'line-numbers' from the <code
 		code.classList.remove(PLUGIN_NAME);
 		// Add the class 'line-numbers' to the <pre>
 		pre.classList.add(PLUGIN_NAME);

@@ -34,6 +34,7 @@
 								<li><a href="#started" id="portfolio-link">环境准备</a></li>
 								<li><a href="#Detailed" id="about-link">实现方法</a></li>
 								<li><a href="#Benchmarks" id="bench-link">基准测试</a></li>
+								<li><a href="#Process" id="robusty">可靠性改进</a></li>
 								<li><a href="#Ref" id="ref-link">参考文献</a></li>
 							</ul>
 						</nav>
@@ -46,9 +47,9 @@
 						<ul class="icons">
 							<li><a href="#" class="icon brands fa-twitter"><span class="label">Twitter</span></a></li>
 							<li><a href="#" class="icon brands fa-facebook-f"><span class="label">Facebook</span></a></li>
-							<li><a href="https://cheer-yuan.github.io/" class="icon brands fa-github"><span class="label">Github</span></a></li>
-							<li><a href="#" class="icon brands fa-dribbble"><span class="label">Dribbble</span></a></li>
-							<li><a href="#" class="icon solid fa-envelope"><span class="label">Email</span></a></li>
+							<li><a href="https://github.com/cheer-Yuan/" class="icon brands fa-github"><span class="label">Github</span></a></li>
+							<li><a href="https://cheer-yuan.github.io/" class="icon brands fa-dribbble"><span class="label">Dribbble</span></a></li>
+							<li><a href="mailto:zhiyuan.l@outlook.com" class="icon solid fa-envelope"><span class="label">Email</span></a></li>
 						</ul>
 
 				</div>
@@ -59,7 +60,24 @@
 			<div id="main">
 
 				<!-- Intro -->
-					<section id="top" class="one dark cover">
+					<section id="top" class="one">
+						<div class="container">
+
+							<br />    <br />
+							<br />
+
+							<br />
+							<br />
+							<br />
+							<br />
+							<br /><br />
+
+
+						</div>
+					</section>
+
+				<!-- General -->
+					<section id="General" class="two">
 						<div class="container">
 
 							<header>
@@ -68,31 +86,19 @@
 							</header>
 
 
+							<p style=text-align:justify;>实验项目需要使用Raspberry树莓派终端连接Intel深感设备来采集静态的点云文件，对采集速度和程序稳定性有要求，越快越好。此处选择使用c++搭配Realsense2 SDK进行开发，并且为最大化数据采集速度，对SDK进行了修改以保存没有纹理信息的点云文件，分别在笔记本x86平台与Raspberry ARM平台进行测试。</p >
 						</div>
 					</section>
-
-
-				<!-- General -->
-				<section id="General" class="two">
-					<div class="container">
-
-						<header>
-							<h2>1. 综述</h2>
-						</header>
-
-						<p style=text-align:justify;>实验项目需要使用Raspberry树莓派终端连接Intel深感设备来采集静态的点云文件，对采集速度和程序稳定性有要求，越快越好。此处选择使用c++搭配Realsense2 SDK进行开发，并且为最大化数据采集速度，对SDK进行了修改以保存没有纹理信息的点云文件，分别在笔记本x86平台与Raspberry ARM平台进行测试。</p >
-					</div>
-				</section>
 
 				<!-- started -->
 				<section id="started" class="three">
 					<div class="container">
 
 						<header>
-							<h2>2. 环境准备</h2>
+							<h2>1. 环境准备</h2>
 						</header>
 
-						<p style=text-align:justify;>根据<a href="https://dev.intelrealsense.com/docs/installation">教程</a>下载，编译并安装 Realsense2 SDK。如不需要省略纹理信息，可以安装<a href="https://github.com/IntelRealSense/librealsense/releases/tag/v2.45.0">官方版本</a>的SDK（不排除在本文章发布后官方更新类似功能），否则在<a href="https://github.com/cheer-Yuan/datasaving">这里下载</a>修改后的SDK（linux，内核版本不晚于5.4.0）。</p >
+						<p style=text-align:justify;>根据<a href="https://dev.intelrealsense.com/docs/installation">教程</a>下载，编译并安装 Realsense2 SDK。如不需要省略纹理信息，可以安装<a href="https://github.com/IntelRealSense/librealsense/releases/tag/v2.45.0">官方版本</a>的SDK（不排除在本文章发布后官方更新类似功能），否则在<a href="https://github.com/cheer-Yuan/datasaving">这里下载</a>修改后的SDK（仅测试于linux，内核版本不晚于5.4.0）。</p >
 						<p style=text-align:justify;>如果已经安装官方版本，使用下列命令重新安装另一版本，建议添加多核编译命令以节约时间。</p >
 						<pre>
 <code class="language-bash">mkdir build && cd build
@@ -109,7 +115,7 @@ sudo make uninstall && make clean && make && sudo make install</code>
 					<div class="container">
 
 						<header>
-                            <h2>3. 实现方法</h2>
+                            <h2>2. 实现方法</h2>
 						</header>
 
 
@@ -217,12 +223,12 @@ auto color = frames.get_color_frame();</code>
 					<div class="container">
 
 						<header>
-							<h2>4.基准测试</h2>
+							<h2>3.基准测试</h2>
 						</header>
 
 						<p style=text-align:justify;>这里做一些基础的测试以对比默认保存方式和改进后的数据保存方式在速度上的差别。先进行x86平台的基准测试，计算每次保存的平均用时。</p >
 						<p style=text-align:justify;>平台配置：Ubuntu 20.04.2 LTS 5.4.0-70-generic，i5-1035G7 CPU @ 1.20GHz，NVMe Micron CT1000P1SSD8</p >
-						<p style=text-align:justify;>普通方式（以最快速度保存三个图片文件以及一个默认配置的点云文件）：0.8s</p >
+						<p style=text-align:justify;>普通方式（保存三个图片文件以及一个默认配置的点云文件）：0.8s</p >
 						<pre>
 		<code class="language-bash"> ./datasaving -r 1 -d 1 -f 1 -c 1 -l 0</code>
 		</pre>
@@ -250,17 +256,83 @@ auto color = frames.get_color_frame();</code>
 					</div>
 				</section>
 
-		<!-- Ref -->
-		<section id="Ref" class="six">
-			<div class="container">
+				<!-- started -->
+				<section id="Process" class="six">
+					<div class="container">
 
-				<header>
-					<h2>5.参考文献</h2>
-				</header>
-				<p style=text-align:justify;><a href="https://github.com/IntelRealSense/librealsense/issues/2488#issuecomment-427814215">https://github.com/IntelRealSense/librealsense/issues/2488#issuecomment-427814215</a>
-					<a href="https://github.com/IntelRealSense/librealsense/tree/master/examples/save-to-disk">https://github.com/IntelRealSense/librealsense/tree/master/examples/save-to-disk</a></p >
-			</div>
-		</section>
+						<header>
+							<h2>4. 可靠性</h2>
+						</header>
+
+						<p style=text-align:justify;>对于在无人职守环境下类工业化的应用，考虑程序意外退出/断电重启等问题发生的可能性。设计一个.bash程序，目的：</p >
+						<p style=text-align:justify;>1，如果已保存的数据数量未达到目标数量，则持续监测后台进程，如发现进程消失（如意外退出或重启）则自动重新启动进程</p >
+						<p style=text-align:justify;>2，重启进程时自动使用上次设置的变量，根据目标数据量和已保存的数据量自动计算还需保存的数据量。
+						</p >
+						<pre>
+<code class="language-bash">#!/bin/bash
+while true
+do
+  # find a particular process, excluding this process itself
+  ps -ef | grep "datasaving" | grep -v "grep" | grep -v "nautilus"
+# compare the returned value with 1 (the process is found or not)
+  if [  "$?" -eq 1  ]
+  then
+    # read all lines in parameters' file into an array
+    mapfile data &lt;parameters.txt
+
+			# extract the 2 parameters
+			n="${data[0]}"
+			i="${data[1]}"
+
+			# check if all works are done
+			if [  $n -eq 0  ]
+			then
+			exit 0
+			fi
+
+			# length of the array
+			leng=${#data[@]}
+
+			# calculate how many groups of data is there to be saved yet
+			if [ $n -ne -1 ]; then n=$((n - leng + 2)); fi
+
+			# restart the process
+			(./datasaving -i $i -n $n)
+    echo "process restarted"
+
+  else
+    echo "process exists"
+  fi
+  sleep 10
+done</code>
+</pre>
+
+						<p style=text-align:justify;></p >
+
+						<p style=text-align:justify;>测试：手动kill数据保存进程后可以自动重新启动。如果需要进入系统后自动进行数据保存则需要将此.bash程序加入rc.local文件</p >
+
+
+					</div>
+				</section>
+
+
+
+				<!-- Ref -->
+				<section id="Ref" class="seven">
+					<div class="container">
+
+						<header>
+							<h2>5.参考文献</h2>
+						</header>
+						<p style=text-align:justify;><a href="https://github.com/IntelRealSense/librealsense/issues/2488#issuecomment-427814215">https://github.com/IntelRealSense/librealsense/issues/2488#issuecomment-427814215</a>
+							<a href="https://github.com/IntelRealSense/librealsense/tree/master/examples/save-to-disk">https://github.com/IntelRealSense/librealsense/tree/master/examples/save-to-disk</a></p >
+					</div>
+				</section>
+
+
+
+
+
 			</div>
 
 		<!-- Footer -->
