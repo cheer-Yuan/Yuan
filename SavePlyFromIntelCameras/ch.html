@@ -1,0 +1,306 @@
+<!DOCTYPE HTML>
+<!--
+	Prologue by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+<head>
+    <title>Prologue by HTML5 UP</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link href="../prism.css" rel="stylesheet" />
+</head>
+
+<body class="is-preload, line-numbers">
+<script src="../prism.js"></script>
+
+
+<!-- Header -->
+			<div id="header">
+
+				<div class="top">
+
+					<!-- Logo -->
+						<div id="logo">
+							<span class="image avatar48"><img src="images/avatar.jpg" alt="" /></span>
+							<h1 id="title">Zhiyuan LIU</h1>
+							<p>Golang / C / C++ Developer</p>
+						</div>
+
+					<!-- Nav -->
+						<nav id="nav">
+							<ul>
+								<li><a href="#General" id="top-link">综述</a></li>
+								<li><a href="#started" id="portfolio-link">环境准备</a></li>
+								<li><a href="#Detailed" id="about-link">实现方法</a></li>
+								<li><a href="#Benchmarks" id="bench-link">基准测试</a></li>
+								<li><a href="#Ref" id="ref-link">参考文献</a></li>
+							</ul>
+						</nav>
+
+				</div>
+
+				<div class="bottom">
+
+					<!-- Social Icons -->
+						<ul class="icons">
+							<li><a href="#" class="icon brands fa-twitter"><span class="label">Twitter</span></a></li>
+							<li><a href="#" class="icon brands fa-facebook-f"><span class="label">Facebook</span></a></li>
+							<li><a href="https://github.com/cheer-Yuan" class="icon brands fa-github"><span class="label">Github</span></a></li>
+							<li><a href="#" class="icon brands fa-dribbble"><span class="label">Dribbble</span></a></li>
+							<li><a href="#" class="icon solid fa-envelope"><span class="label">Email</span></a></li>
+						</ul>
+
+				</div>
+
+			</div>
+
+		<!-- Main -->
+			<div id="main">
+
+				<!-- Intro -->
+					<section id="top" class="one dark cover">
+						<div class="container">
+
+							<header>
+								<h2 class="alt">使用Intel Realsense2 SDK 及 L515激光雷达或 D455深感相机自动保存.ply格式的深度点云信息文件</h2>
+								<p>需求：对cMake，C++，点云格式以及 Realsense2 SDK 的基本了解</p>
+							</header>
+
+
+						</div>
+					</section>
+
+
+				<!-- General -->
+				<section id="General" class="two">
+					<div class="container">
+
+						<header>
+							<h2>1. 综述</h2>
+						</header>
+
+						<p style=text-align:justify;>实验项目需要使用Raspberry树莓派终端连接Intel深感设备来采集静态的点云文件，对采集速度和程序稳定性有要求，越快越好。此处选择使用c++搭配Realsense2 SDK进行开发，并且为最大化数据采集速度，对SDK进行了修改以保存没有纹理信息的点云文件，分别在笔记本x86平台与Raspberry ARM平台进行测试。</p >
+					</div>
+				</section>
+
+				<!-- started -->
+				<section id="started" class="three">
+					<div class="container">
+
+						<header>
+							<h2>2. 环境准备</h2>
+						</header>
+
+						<p style=text-align:justify;>根据<a href="https://dev.intelrealsense.com/docs/installation">教程</a>下载，编译并安装 Realsense2 SDK。如不需要省略纹理信息，可以安装<a href="https://github.com/IntelRealSense/librealsense/releases/tag/v2.45.0">官方版本</a>的SDK（不排除在本文章发布后官方更新类似功能），否则在<a href="https://github.com/cheer-Yuan/datasaving">这里下载</a>修改后的SDK（linux，内核版本不晚于5.4.0）。</p >
+						<p style=text-align:justify;>如果已经安装官方版本，使用下列命令重新安装另一版本，建议添加多核编译命令以节约时间。</p >
+						<pre>
+<code class="language-bash">mkdir build && cd build
+cmake ../ -DCMAKE_BUILD_TYPE=Release
+sudo make uninstall && make clean && make && sudo make install</code>
+</pre>
+
+
+					</div>
+				</section>
+
+				<!-- Detailed -->
+				<section id="Detailed" class="four">
+					<div class="container">
+
+						<header>
+                            <h2>3. 实现方法</h2>
+						</header>
+
+
+						<p style=text-align:justify>手动设置深度流的分辨率并开启信息流，此处取最小分辨率以最大化数据获取速度，不同型号的设备支持的分辨率会有不同，例如L515的最低深度分辨率为360*240而D455则为424*240。默认的深感分辨率约为640*480，所以取最小值时的数据处理量约为默认值的1/4。</p>
+
+						<pre>
+<code class="language-cpp">rs2::pipeline pipe;
+rs2::config cfg;
+if (config.if_lowres() == 0) {
+    cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_ANY, 0);
+} else if (config.if_lowres() == 5) {
+    cfg.enable_stream(RS2_STREAM_DEPTH, 424, 240, RS2_FORMAT_ANY, 0);
+} else {
+    cfg.enable_stream(RS2_STREAM_DEPTH, 320, 240, RS2_FORMAT_ANY, 0);
+}
+pipe.start(cfg);</code>
+</pre>
+
+						<p style=text-align:justify></p>
+
+
+						<p style=text-align:justify>获取深度帧和图像帧，为之后根据输入的参数决定保存哪些数据作准备，这样如果只保存点云文件的话就可以省略其他数据以最大化数据获取速度。</p>
+
+						<pre>
+<code class="language-cpp">rs2::frameset frames = pipe.wait_for_frames();
+auto depth = frames.get_depth_frame();
+auto color = frames.get_color_frame();</code>
+</pre>
+
+						<p style=text-align:justify></p>
+
+						<p style=text-align:justify>根据使用者输入的参数决定是否保存纹理信息， export_to_ply_notexture为新加入SDK的函数。</p>
+
+						<pre>
+<code class="language-cpp">if (ifColor == 1) {
+    // Map the point cloud to the given color frame
+    pc.map_to(color);
+    // Generate the point cloud
+    rs2::points points = pc.calculate(depth);
+    // Export the point cloud to a PLY file with colors
+    points.export_to_ply(ply_file.str(), color);
+} else if (ifColor == 0) {
+    // Generate the point cloud
+    rs2::points points = pc.calculate(depth);
+    // Export the point cloud to a PLY file without colors
+    points.export_to_ply_notexture(ply_file.str());
+} </code>
+</pre>
+
+                        <p style=text-align:justify></p>
+
+                        <p style=text-align:justify>根据输入的参数决定是否保存图像信息。默认会保存深度，红外和普通照片三种图像文件以及点云文件。为最大化数据保存速度，此处我们可以选择只保存点云文件。</p>
+
+                        <pre>
+<code class="language-cpp">for (auto&& frame : frames)
+{
+    // We can only save video frames as pngs, so we skip the rest
+    if (auto vf = frame.as&lt;rs2::video_frame>())
+    {
+        // Use the colorizer to get an rgb image for the depth stream
+        if (vf.is&lt;rs2::depth_frame>()) vf = color_map.process(frame);
+
+        // Write the corresponding images to disk, according to the given parameters
+        std::stringstream png_file;
+
+        if (vf.get_profile().stream_name() == "Depth") {
+            if (ifDepth) {
+                png_file << direction << currenttime << vf.get_profile().stream_name() << ".png";
+                stbi_write_png(png_file.str().c_str(), vf.get_width(), vf.get_height(), vf.get_bytes_per_pixel(), vf.get_data(), vf.get_stride_in_bytes());
+                std::cout << "Saved " << png_file.str() << std::endl;
+
+                // Record the metadata
+                std::stringstream csv_file;
+                csv_file << direction << currenttime << vf.get_profile().stream_name()
+                         << "-metadata.csv";
+                metadataToCsv(vf, csv_file.str());
+            }
+        }
+
+        if (vf.get_profile().stream_name() == "Infrared") {
+            if (ifInfr) {...}
+        }
+
+        if (vf.get_profile().stream_name() == "Color") {
+            if (ifImages) {...}
+        }
+    }
+} </code>
+</pre>
+
+						<p style=text-align:justify></p>
+
+						<p style=text-align:justify>保存后的点云文件可以使用meshlab等软件浏览编辑，或作为各种分析算法的输入数据。详细的数据构成会在下一篇讨论对点云文件进行几何平面分析的文章进行介绍。</p>
+
+						<a href="#" class="image featured"><img src="images/pcexample.png" alt="" /></a>
+
+						<pre>
+<code class="language-cpp">if (ifColor == 1) {
+    // Map the point cloud to the given color frame
+    pc.map_to(color);
+    // Generate the point cloud
+    rs2::points points = pc.calculate(depth);
+    // Export the point cloud to a PLY file with colors
+    points.export_to_ply(ply_file.str(), color);
+} else if (ifColor == 0) {
+    // Generate the point cloud
+    rs2::points points = pc.calculate(depth);
+    // Export the point cloud to a PLY file without colors
+    points.export_to_ply_notexture(ply_file.str());
+} </code>
+</pre>
+
+
+
+					</div>
+				</section>
+
+
+
+				<!-- Benchmarks -->
+				<section id="Benchmarks" class="five">
+					<div class="container">
+
+						<header>
+							<h2>4.基准测试</h2>
+						</header>
+
+						<p style=text-align:justify;>这里做一些基础的测试以对比默认保存方式和改进后的数据保存方式在速度上的差别。先进行x86平台的基准测试，计算每次保存的平均用时。</p >
+						<p style=text-align:justify;>平台配置：Ubuntu 20.04.2 LTS 5.4.0-70-generic，i5-1035G7 CPU @ 1.20GHz，NVMe Micron CT1000P1SSD8</p >
+						<p style=text-align:justify;>普通方式（以最快速度保存三个图片文件以及一个默认配置的点云文件）：0.8s</p >
+						<pre>
+		<code class="language-bash"> ./datasaving -r 1 -d 1 -f 1 -c 1 -l 0</code>
+		</pre>
+						<p style=text-align:justify></p>
+
+						<p style=text-align:justify;>只保存默认配置的点云文件：0.55s</p >
+						<pre>
+		<code class="language-bash"> ./datasaving -c 1 -l 0</code>
+		</pre>
+
+						<p style=text-align:justify></p>
+
+						<p style=text-align:justify;>只保存省略纹理信息并缩小了分辨率的点云文件：0.1s</p >
+
+						<pre>
+		<code class="language-bash">./datasaving -l 1</code>
+		</pre>
+
+						<p style=text-align:justify></p>
+
+
+						<p style=text-align:justify;>对于一些不需要点云的颜色信息和分辨率的情况，数据的采样速度可以接近每秒十次，相对于普通保存方式的加速比达到800%。即使需要完整的点云文件以及图像文件，使用本程序也可以获得比官方保存方式（每次大于等于一秒，未验证）更快的保存速度。</p >
+						<p style=text-align:justify;>我们也在使用sd卡作为存储介质的Raspberry 3 上进行了测试，在保存最小文件的情况下，平均用时约为0.4s。考虑到其性能远低于x86平台，可以认为这是一个令人满意的结果。</p >
+
+					</div>
+				</section>
+
+		<!-- Ref -->
+		<section id="Ref" class="six">
+			<div class="container">
+
+				<header>
+					<h2>5.参考文献</h2>
+				</header>
+				<p style=text-align:justify;><a href="https://github.com/IntelRealSense/librealsense/issues/2488#issuecomment-427814215">https://github.com/IntelRealSense/librealsense/issues/2488#issuecomment-427814215</a>
+					<a href="https://github.com/IntelRealSense/librealsense/tree/master/examples/save-to-disk">https://github.com/IntelRealSense/librealsense/tree/master/examples/save-to-disk</a></p >
+			</div>
+		</section>
+			</div>
+
+		<!-- Footer -->
+		<div id="footer">
+
+			<!-- Copyright -->
+			<ul class="copyright">
+				<li>&copy; Zhiyuan LIU. All rights reserved.</li>
+			</ul>
+
+		</div>
+
+		<!-- Scripts -->
+		<script src="../assets/js/jquery.min.js"></script>
+		<script src="../assets/js/jquery.scrolly.min.js"></script>
+		<script src="../assets/js/jquery.scrollex.min.js"></script>
+		<script src="../assets/js/browser.min.js"></script>
+		<script src="../assets/js/breakpoints.min.js"></script>
+		<script src="../assets/js/util.js"></script>
+		<script src="../assets/js/main.js"></script>
+
+
+	</body>
+</html>
