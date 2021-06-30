@@ -4,7 +4,7 @@
 -->
 <html>
 <head>
-    <title>Use an Intel D400/L500 device to acquire .ply point cloud data</title>
+    <title>改进RANSAC算法的点云平面分析</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
     <link rel="stylesheet" href="../assets/css/main.css" />
@@ -30,12 +30,12 @@
         <!-- Nav -->
         <nav id="nav">
             <ul>
-                <li><a href="#General" id="top-link">General description</a></li>
-                <li><a href="#started" id="portfolio-link">Preparing environment</a></li>
-                <li><a href="#Detailed" id="about-link">Methods</a></li>
-                <li><a href="#Benchmarks" id="bench-link">Benchmarks</a></li>
-                <li><a href="#Process" id="robusty">Robustness enhancement</a></li>
-                <li><a href="#Ref" id="ref-link">References</a></li>
+                <li><a href="#General" id="top-link">综述</a></li>
+                <li><a href="#started" id="portfolio-link">环境准备</a></li>
+                <li><a href="#Detailed" id="about-link">实现方法</a></li>
+                <li><a href="#Benchmarks" id="bench-link">基准测试</a></li>
+                <li><a href="#Process" id="robusty">可靠性改进</a></li>
+                <li><a href="#Ref" id="ref-link">参考文献</a></li>
             </ul>
         </nav>
 
@@ -81,12 +81,12 @@
         <div class="container">
 
             <header>
-                <h2 class="alt">Use Intel Realsense2 SDK and an D455 or an L515 device to save cloud points files in .ply format, automatically and at a high speed</h2>
-                <p>Pre-requisites : Basic knowledge on c, c++, Intel Realsense2 SDK and data structure of the .ply format</p>
+                <h2 class="alt">使用Intel Realsense2 SDK 及 L515激光雷达或 D455深感相机自动保存.ply格式的深度点云信息文件</h2>
+                <p>需求：对cMake，C++，点云格式以及 Realsense2 SDK 的基本了解</p>
             </header>
 
 
-            <p style=text-align:justify;>In our project, we need to use an Intel device, connected to a Raspberry terminal, to collect point clouds data , efficiently and in a reliable way. Here we choose to develop a data saving system using Realsense2 SDK in c++. In order to collect the data as fast as possible, we added a function to the SDK, in which the point cloud data is collected without texture information. The whole system is tested on a x86 laptop platform and a Raspberry 3 platform.</p >
+            <p style=text-align:justify;>实验项目需要使用Raspberry树莓派终端连接Intel深感设备来采集静态的点云文件，对采集速度和程序稳定性有要求，越快越好。此处选择使用c++搭配Realsense2 SDK进行开发，并且为最大化数据采集速度，对SDK进行了修改以保存没有纹理信息的点云文件，分别在笔记本x86平台与Raspberry ARM平台进行测试。</p >
         </div>
     </section>
 
@@ -95,11 +95,11 @@
         <div class="container">
 
             <header>
-                <h2>1. General description</h2>
+                <h2>1. 环境准备</h2>
             </header>
 
-            <p style=text-align:justify;>Follow the <a href="https://dev.intelrealsense.com/docs/installation">tutorial here, </a>download, compile and install the Realsense2 SDK。If the texture information is needed, you can download the official version<a href="https://github.com/IntelRealSense/librealsense/releases/tag/v2.45.0"> here </a>instead of the customized version. If you want to maximize the speed of the data recording, download <a href="https://github.com/cheer-Yuan/datasaving">here </a>the customized SDK. The customized SDK is based on the official version in early 2021 and may not be updated in the future. It is only tested on a Linux system, the kernel version should be 5.4.0 or earlier.</p >
-            <p style=text-align:justify;>If an official SDK is already installed before, use the following commands to install the customized version. Consider to add a multicore compiling flag to save the time, which can be long. </p >
+            <p style=text-align:justify;>根据<a href="https://dev.intelrealsense.com/docs/installation">教程</a>下载，编译并安装 Realsense2 SDK。如不需要省略纹理信息，可以安装<a href="https://github.com/IntelRealSense/librealsense/releases/tag/v2.45.0">官方版本</a>的SDK（不排除在本文章发布后官方更新类似功能），否则在<a href="https://github.com/cheer-Yuan/datasaving">这里下载</a>修改后的SDK（仅测试于linux，内核版本不晚于5.4.0）。</p >
+            <p style=text-align:justify;>如果已经安装官方版本，使用下列命令重新安装另一版本，建议添加多核编译命令以节约时间。</p >
             <pre>
 <code class="language-bash">mkdir build && cd build
 cmake ../ -DCMAKE_BUILD_TYPE=Release
@@ -115,11 +115,11 @@ sudo make uninstall && make clean && make && sudo make install</code>
         <div class="container">
 
             <header>
-                <h2>2. Methods</h2>
+                <h2>2. 实现方法</h2>
             </header>
 
 
-            <p style=text-align:justify>Here we set the resolution of the depth data flow then start it. To maximize the data sacing speed, we provide the option to choose the lowest resolution, which can vary according to the device. For example, the lowest resolution supported by L515 is 320*240, while for D455 it is 424*240. Generally, the amount of data to be processed using the lowest resolution is about 1/4 for the default resolution 640*480. </p>
+            <p style=text-align:justify>手动设置深度流的分辨率并开启信息流，此处取最小分辨率以最大化数据获取速度，不同型号的设备支持的分辨率会有不同，例如L515的最低深度分辨率为360*240而D455则为424*240。默认的深感分辨率约为640*480，所以取最小值时的数据处理量约为默认值的1/4。</p>
 
             <pre>
 <code class="language-cpp">rs2::pipeline pipe;
@@ -137,7 +137,7 @@ pipe.start(cfg);</code>
             <p style=text-align:justify></p>
 
 
-            <p style=text-align:justify>Get the depth frame and the RGB frame. We decide which data to use, later according to the parameters given by user.</p>
+            <p style=text-align:justify>获取深度帧和图像帧，为之后根据输入的参数决定保存哪些数据作准备，这样如果只保存点云文件的话就可以省略其他数据以最大化数据获取速度。</p>
 
             <pre>
 <code class="language-cpp">rs2::frameset frames = pipe.wait_for_frames();
@@ -147,7 +147,7 @@ auto color = frames.get_color_frame();</code>
 
             <p style=text-align:justify></p>
 
-            <p style=text-align:justify>Decide where the texture information will be taken into account. The export_to_ply_notexture function, newly added to the SDK, export the depth data without texture.</p>
+            <p style=text-align:justify>根据使用者输入的参数决定是否保存纹理信息， export_to_ply_notexture为新加入SDK的函数。</p>
 
             <pre>
 <code class="language-cpp">if (ifColor == 1) {
@@ -167,7 +167,7 @@ auto color = frames.get_color_frame();</code>
 
             <p style=text-align:justify></p>
 
-            <p style=text-align:justify>Decide if the images will be saved, according to the given parameters. In default mode, we get 3 images : depth, RGB and infrared, as well as a .ply file. To maximize the speed of data recording, we can choose to save the .ply file only.</p>
+            <p style=text-align:justify>根据输入的参数决定是否保存图像信息。默认会保存深度，红外和普通照片三种图像文件以及点云文件。为最大化数据保存速度，此处我们可以选择只保存点云文件。</p>
 
             <pre>
 <code class="language-cpp">for (auto&& frame : frames)
@@ -208,7 +208,7 @@ auto color = frames.get_color_frame();</code>
 
             <p style=text-align:justify></p>
 
-            <p style=text-align:justify>The saved .ply file can be visualized by applications such as meshlab, or given to other analytic algorithms.</p>
+            <p style=text-align:justify>保存后的点云文件可以使用meshlab等软件浏览编辑，或作为各种分析算法的输入数据。详细的数据构成会在下一篇讨论对点云文件进行几何平面分析的文章进行介绍。</p>
 
             <a href="#" class="image featured"><img src="images/pcexample.png" alt="" /></a>
 
@@ -223,25 +223,25 @@ auto color = frames.get_color_frame();</code>
         <div class="container">
 
             <header>
-                <h2>3.Benchmarks</h2>
+                <h2>3.基准测试</h2>
             </header>
 
-            <p style=text-align:justify;>Here we did some basic benchmarks to see the differences to the default method and our customized method of data recording. First we did the benchmark on the x86 laptop platform and calculate the average time spent on generating each (group of) file.</p >
-            <p style=text-align:justify;>Hardware: Ubuntu 20.04.2 LTS 5.4.0-70-generic，i5-1035G7 CPU @ 1.20GHz，NVMe Micron CT1000P1SSD8</p >
-            <p style=text-align:justify;>Default (save 3 images and 1 point cloud file): 0.8s</p >
+            <p style=text-align:justify;>这里做一些基础的测试以对比默认保存方式和改进后的数据保存方式在速度上的差别。先进行x86平台的基准测试，计算每次保存的平均用时。</p >
+            <p style=text-align:justify;>平台配置：Ubuntu 20.04.2 LTS 5.4.0-70-generic，i5-1035G7 CPU @ 1.20GHz，NVMe Micron CT1000P1SSD8</p >
+            <p style=text-align:justify;>普通方式（保存三个图片文件以及一个默认配置的点云文件）：0.8s</p >
             <pre>
 		<code class="language-bash"> ./datasaving -r 1 -d 1 -f 1 -c 1 -l 0</code>
 		</pre>
             <p style=text-align:justify></p>
 
-            <p style=text-align:justify;>Only save the point cloud file with default configuration (with texture information and use the default resolution): 0.55s</p >
+            <p style=text-align:justify;>只保存默认配置的点云文件：0.55s</p >
             <pre>
 		<code class="language-bash"> ./datasaving -c 1 -l 0</code>
 		</pre>
 
             <p style=text-align:justify></p>
 
-            <p style=text-align:justify;>Only save the point cloud file without the texture information and using the lowest resolution: 0.1s</p >
+            <p style=text-align:justify;>只保存省略纹理信息并缩小了分辨率的点云文件：0.1s</p >
 
             <pre>
 		<code class="language-bash">./datasaving -l 1</code>
@@ -250,8 +250,8 @@ auto color = frames.get_color_frame();</code>
             <p style=text-align:justify></p>
 
 
-            <p style=text-align:justify;>Conclusion: If the texture information and a high resolution are not needed in the project, it is possible to get the cloud point file as fast as 0.1 second per file. The speedup is about 800%. </p >
-            <p style=text-align:justify;>The program is also tested on a Raspberry 3 with an SD card. The maximal data saving speed is about 0.4s per point cloud file, using the lowest resolution and no texture file. Considering that the performance is far lower than a x86 platform, it is a satisfying result.</p >
+            <p style=text-align:justify;>对于一些不需要点云的颜色信息和分辨率的情况，数据的采样速度可以接近每秒十次，相对于普通保存方式的加速比达到800%。即使需要完整的点云文件以及图像文件，使用本程序也可以获得比官方保存方式（每次大于等于一秒，未验证）更快的保存速度。</p >
+            <p style=text-align:justify;>我们也在使用sd卡作为存储介质的Raspberry 3 上进行了测试，在保存最小文件的情况下，平均用时约为0.4s。考虑到其性能远低于x86平台，可以认为这是一个令人满意的结果。</p >
 
         </div>
     </section>
@@ -261,12 +261,13 @@ auto color = frames.get_color_frame();</code>
         <div class="container">
 
             <header>
-                <h2>4. Robustness</h2>
+                <h2>4. 可靠性</h2>
             </header>
 
-            <p style=text-align:justify;>In order to use the program in an industrial, unsupervised and long-time-spam environment, accidental crash or system restart after a power should be taken into account. A bash program is made, which :</p >
-            <p style=text-align:justify;>1，Supervises the main process in background. If the a process disappears, restart it.</p >
-            <p style=text-align:justify;>2，When restarting the process, use the parameters previously given. If the number of data is inferior to the target number, then adjust number of data yet to be saved automatically. </p >
+            <p style=text-align:justify;>对于在无人职守环境下类工业化的应用，考虑程序意外退出/断电重启等问题发生的可能性。设计一个.bash程序，目的：</p >
+            <p style=text-align:justify;>1，如果已保存的数据数量未达到目标数量，则持续监测后台进程，如发现进程消失（如意外退出或重启）则自动重新启动进程</p >
+            <p style=text-align:justify;>2，重启进程时自动使用上次设置的变量，根据目标数据量和已保存的数据量自动计算还需保存的数据量。
+            </p >
             <pre>
 <code class="language-bash">#!/bin/bash
 while true
@@ -308,7 +309,7 @@ done</code>
 
             <p style=text-align:justify;></p >
 
-            <p style=text-align:justify;>Test : kill the process manually when the data is being recorded, the process can reboot automatically and the parameters can be loaded successfully. If we need to launch the main process automatically after a system reboot, the program here above should be added to the rc.local file. </p >
+            <p style=text-align:justify;>测试：手动kill数据保存进程后可以自动重新启动。如果需要进入系统后自动进行数据保存则需要将此.bash程序加入rc.local文件</p >
 
 
         </div>
@@ -321,7 +322,7 @@ done</code>
         <div class="container">
 
             <header>
-                <h2>5. References</h2>
+                <h2>5.参考文献</h2>
             </header>
             <p style=text-align:justify;><a href="https://github.com/IntelRealSense/librealsense/issues/2488#issuecomment-427814215">https://github.com/IntelRealSense/librealsense/issues/2488#issuecomment-427814215</a>
                 <a href="https://github.com/IntelRealSense/librealsense/tree/master/examples/save-to-disk">https://github.com/IntelRealSense/librealsense/tree/master/examples/save-to-disk</a></p >
@@ -339,7 +340,7 @@ done</code>
 
     <!-- Copyright -->
     <ul class="copyright">
-        <li>&copy; Zhiyuan LIU. All rights reserved. <a href="https://cheer-yuan.github.io/SavePlyFromIntelCameras/ch.html">CH</a> <a href="https://cheer-yuan.github.io/SavePlyFromIntelCameras/en.html">EN</a></li>
+        <li>&copy; Zhiyuan LIU. All rights reserved.</li>
     </ul>
 
 </div>
