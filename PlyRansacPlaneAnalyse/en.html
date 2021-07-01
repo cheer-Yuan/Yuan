@@ -30,14 +30,14 @@
         <!-- Nav -->
         <nav id="nav">
             <ul>
-                <li><a href="#General" id="top-link">综述</a></li>
-                <li><a href="#started" id="portfolio-link">数据准备</a></li>
-                <li><a href="#Detailed" id="about-link">核心算法</a></li>
-                <li><a href="#Benchmarks" id="bench-link">数据读取</a></li>
-                <li><a href="#Process" id="robusty">基准测试</a></li>
-                <li><a href="#Paral" id="parall">并发优化</a></li>
-                <li><a href="#Futur" id="fut-link">后续工作</a></li>
-                <li><a href="#Ref" id="ref-link">参考文献</a></li>
+                <li><a href="#General" id="top-link">General</a></li>
+                <li><a href="#started" id="portfolio-link">Data preparing</a></li>
+                <li><a href="#Detailed" id="about-link">Kernel algorithm</a></li>
+                <li><a href="#Benchmarks" id="bench-link">Data reading</a></li>
+                <li><a href="#Process" id="robusty">Benchmark</a></li>
+                <li><a href="#Paral" id="parall">Concurrency</a></li>
+                <li><a href="#Futur" id="fut-link">Future work</a></li>
+                <li><a href="#Ref" id="ref-link">References</a></li>
             </ul>
         </nav>
 
@@ -88,7 +88,7 @@
             </header>
 
 
-            <p style=text-align:justify;>使用一种改进的RANSAC算法对点云文件进行分析并得到其中所含的平面数量和每个平面的一般式方程 (ax + by + cz = d)。同时开发了原生Golang的点云文件读取和写入程序，并进行了性能优化。</p >
+            <p style=text-align:justify;>In this article, we try to use an improved RANSAC algorithm to analyze a cloud point file in .ply format, in order to get equations (ax + by + cz = d) which represent every a plane facade in it. At the mean time, a program 100% in Golang is implemented to read and write information to files in .ply format. Optimizations are done and performance improvements are achieved. </p >
         </div>
     </section>
 
@@ -97,12 +97,12 @@
         <div class="container">
 
             <header>
-                <h2>1. 环境准备</h2>
+                <h2>I. Data preparing</h2>
             </header>
 
-            <p style=text-align:justify;>这里使用通过Intel深感设备获得的，不含有纹理信息的.ply点云文件作为程序的输入。如果使用其它方式获得的数据，由于header头文件和数据存储格式的差异，可能需要对程序进行一定的调整。</p >
+            <p style=text-align:justify;>The point cloud data used here is collected by an Intel depth device. The relevant methods are discussed in <a href="https://cheer-yuan.github.io/SavePlyFromIntelCameras/en.html">the previous article.</a> In case of using devices other than those fabricated by Intel, modifications should be applied to the program due to the differences in the way that the data and the header are arranged.</p >
             <a href="#" class="image featured"><img src="images/Screenshot.png" alt="" /></a>
-            <p style=text-align:justify;>可以看到，与头文件不同，数据主体部分以二进制的方式存储，且点与点之间没有空格或换行符。读取文件时，先对头文件进行语义分析并提取相关信息，再对数据主体进行读取。</p >
+            <p style=text-align:justify;>Here the data is coded in binary without any space or linefeed, while the header is in ASCII. When reading the file, the header should be parsed first to get useful information such as the quantity of vertices and faces. Then the information is used to read the body of the file.</p >
 
         </div>
     </section>
@@ -112,15 +112,15 @@
         <div class="container">
 
             <header>
-                <h2>2. 核心算法</h2>
+                <h2>2. Kernel algorithm</h2>
             </header>
             <header>
-                <h3 style=text-align:justify>2.1 起始</h3>
+                <h3 style=text-align:justify>2.1 Start</h3>
             </header>
 
-            <p style=text-align:justify>随机采样一致（Random SAmple Consensus）的实质是随机选取一些能够建立所需模型的样本点，构建模型，并判断该模型是否满足需求，循环重复直至满足退出条件。这里的目的是从点云中拟合平面，所以取三个随机点，并计算平面。</p>
+            <p style=text-align:justify>The essential of RANSAC (Random SAmple Consensus) is to choose some samples randomly to construct a model. If the model satisfies the conditions, it will be kept, otherwise it will be dropped. This process will be repeated until the exit condition is satisfied. In this example, the model to construct is a plane and the samples are 3 points.</p>
 
-            <p style=text-align:justify>首先，从点云中选取一定数量的子集作为平面的候选点。为了在重复迭代时节省时间，这里使用原数据的一个随机子集进行计算，减少计算量。子集的点的数量将影响计算速度。</p>
+            <p style=text-align:justify>First, choose a batch of points randomly among all of the samples. This is to reduce the amount of calculation after in the iteration. A parameter should be given by user to define the number of the points in each batch. This parameter has influence on the time and the quality of the calculation. </p>
             <pre>
 <code class="language-go">// pick a batch of n vertices randomly from the vertex slice
 vertexBatch := make([]plyfile.VertexMono, 0)
@@ -139,11 +139,11 @@ for {
             <p style=text-align:justify></p>
 
             <header>
-                <h3 style=text-align:justify>2.2 RANSAC迭代</h3>
+                <h3 style=text-align:justify>2.2 Main iteration</h3>
             </header>
 
 
-            <p style=text-align:justify>随机选取三个点并形成平面，计算上一步的子集中的所有点和此平面的距离，如果距离小于给定值则记为内点，否则记为外点。如果内点的数量达到一定比例，则认为此平面存在，放入验证组。如果没有达到此比例，则重新选择三个点并计算。如果达到一定迭代次数仍未找到拥有内点的数量达到一定比例的平面，则返回拥有内点数量最多的平面。</p>
+            <p style=text-align:justify>Choose 3 points randomly to form a plane and compute the distance between 随机选取三个点并形成平面，计算上一步的子集中的所有点和此平面的距离，如果距离小于给定值则记为内点，否则记为外点。如果内点的数量达到一定比例，则认为此平面存在，放入验证组。如果没有达到此比例，则重新选择三个点并计算。如果达到一定迭代次数仍未找到拥有内点的数量达到一定比例的平面，则返回拥有内点数量最多的平面。</p>
 
             <pre>
 <code class="language-go">// pick 3 vertices randomly

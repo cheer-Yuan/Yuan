@@ -513,44 +513,44 @@ return planes, len(planes), verticesOfPlanes</code>
 
 						<p style=text-align:justify;>考虑以下场景：数据输入端持续采集并保存数据，由于采集速度远大于数据分析速度，容易处理不完，造成堆积。对于每个点云文件的分析是独立的进程，并不依赖于其它文件，因此在理想状态下可以完美并行化（Amdahl’s Law）。在实际应用中，体现为可以方便地并行处理每个文件，获得性能提升。</p >
 
-						<pre>
-		<code class="language-go">if modeProc == 2 {
-	// modeProc new reader 32 bit
-	for _, file := range files {
-		// compose the filename
-		log.Println(location + file)
-		// read data
-		vlist, _ := reader.ReadPLYMono32Huge1(location + file)
-		// compute planes
-		Planes, numPlanes, _ := calculator.PlaneMonoConsecRANSAC32(vlist, 0.02, 0.1, 500, 0.1, 6000, 2000, 500)
-		// output of the data
-		log.Println("The number of planes detected : ", numPlanes)
-		for _, i := range Planes {
-			log.Println(i)
-		}
-		log.Println("\n")
-		go func(file string, location string, wg *sync.WaitGroup) {
-			defer wg.Done()
+				<pre>
+<code class="language-go">if modeProc == 2 {
+// modeProc new reader 32 bit
+for _, file := range files {
+// compose the filename
+log.Println(location + file)
+// read data
+vlist, _ := reader.ReadPLYMono32Huge1(location + file)
+// compute planes
+Planes, numPlanes, _ := calculator.PlaneMonoConsecRANSAC32(vlist, 0.02, 0.1, 500, 0.1, 6000, 2000, 500)
+// output of the data
+log.Println("The number of planes detected : ", numPlanes)
+for _, i := range Planes {
+	log.Println(i)
+}
+log.Println("\n")
+go func(file string, location string, wg *sync.WaitGroup) {
+	defer wg.Done()
 
-			errC := Compressor.Compress("/home/liu/Desktop/Stages/gogs/src/dataprocessing/gzoutput/" + file + ".gz", location + file, modeComp)
-			if errC != nil {
-				panic(errC)
-			}
-			errR := os.Remove(location + file)
-			if errR != nil {
-				panic(errR)
-			}
-			log.Println("Compressed : ", file)
-		}(file, location, &wg)
+	errC := Compressor.Compress("/home/liu/Desktop/Stages/gogs/src/dataprocessing/gzoutput/" + file + ".gz", location + file, modeComp)
+	if errC != nil {
+		panic(errC)
 	}
+	errR := os.Remove(location + file)
+	if errR != nil {
+		panic(errR)
+	}
+	log.Println("Compressed : ", file)
+}(file, location, &wg)
+}
 }
 wg.Wait()</code>
-		</pre>
+</pre>
 						<p style=text-align:justify;></p >
 
 						<p style=text-align:justify;>这里使用goroutines进行并发计算，不限制最大的goroutines数量，和waitgroup进行线程同步。在与前文相同的x86平台上进行了基准测试以比较和普通模式下的性能差异。使用相同的处理、压缩参数和数据文件，普通模式下耗时9.186s，并发模式耗时3.860s，加速比约为2,380.</p >
 
-						<p style=text-align:justify;>在其他的优化方面，尝试了将全局浮点数类型从64位改为32位以观察在32位Raspberry设备上的性能表现，性能差异极小，怀疑可能是误差。用快速平方根算法替代goNum库内的平方根算法，造成性能损失，也被放弃。</p >
+						<p style=text-align:justify;>关于其他方面的优化，我们尝试了将全局浮点数类型从64位改为32位并测试在32位Raspberry设备上的性能表现，在运行时间上的差异极小，怀疑是误差。此外，用快速平方根算法替代goNum库内的平方根算法，结果造成了性能损失，也被放弃。</p >
 
 
 					</div>
