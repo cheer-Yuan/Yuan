@@ -395,8 +395,8 @@ return planes, len(planes), verticesOfPlanes</code>
 
 						<p style=text-align:justify;>众所周知，.ply文件存在两种编码方式，即ASCII与二进制。前者可以直接作为数字被读取，而后者需要经过解码函数作为二进制输出。由于目标文件的编码方式为二进制，这里只开发了二进制的读取和写入功能。</p >
 
-						<pre>
-		<code class="language-go">if name == "vertex" {
+<pre>
+<code class="language-go">if name == "vertex" {
 	// grab vertex elements
 	for i := 0; i < num_elems; i++ {
 		plyfile.PlyGetElement(cplyfile, &vlist[i], unsafe.Sizeof(plyfile.VertexMono{}))
@@ -414,12 +414,12 @@ return planes, len(planes), verticesOfPlanes</code>
 	}
 }
 </code>
-		</pre>
+</pre>
 						<p style=text-align:justify></p>
 
 						<p style=text-align:justify;>对于读入的每组数据，根据二进制编码方式（Little / Big Endian）进行解码。</p >
-						<pre>
-		<code class="language-go">func PlyGetElement(plyfile *PlyFile, element interface{}, size uintptr) {
+<pre>
+<code class="language-go">func PlyGetElement(plyfile *PlyFile, element interface{}, size uintptr) {
 	switch plyfile.file_type {
 	case PLY_BINARY_LE:
 		buffbytes := make([]byte, size)
@@ -434,7 +434,7 @@ return planes, len(planes), verticesOfPlanes</code>
 		_ = binary.Read(r, binary.BigEndian, element)
 	}
 }</code>
-		</pre>
+</pre>
 
 						<p style=text-align:justify></p>
 
@@ -454,7 +454,7 @@ return planes, len(planes), verticesOfPlanes</code>
 
 
 						<pre>
-		<code class="language-go">if name == "vertex" {
+<code class="language-go">if name == "vertex" {
 	// read all the vertices
 	vlisthuge := make([]float32, num_elems * 3)
 	plyfile.PlyGetElementHuge(cplyfile, &vlisthuge, len(vlisthuge) * 4)
@@ -471,7 +471,7 @@ return planes, len(planes), verticesOfPlanes</code>
 		faces = append(faces, f1, f2, f3)
 	}
 }</code>
-		</pre>
+</pre>
 						<p style=text-align:justify></p>
 
 						<p style=text-align:justify>可以看到，使用新的读取函数后，读取数据所占用的时间比例明显降低，整体速度从2,74s提升至1,92s，在没有优化计算部分的情况下获得了42,71%的性能提升。</p>
@@ -508,7 +508,7 @@ return planes, len(planes), verticesOfPlanes</code>
 					<div class="container">
 
 						<header>
-							<h2>5.并发优化</h2>
+							<h2>5. 并发优化</h2>
 						</header>
 
 						<p style=text-align:justify;>考虑以下场景：数据输入端持续采集并保存数据，由于采集速度远大于数据分析速度，容易处理不完，造成堆积。对于每个点云文件的分析是独立的进程，并不依赖于其它文件，因此在理想状态下可以完美并行化（Amdahl’s Law）。在实际应用中，体现为可以方便地并行处理每个文件，获得性能提升。</p >

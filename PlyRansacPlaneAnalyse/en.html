@@ -395,8 +395,8 @@ return planes, len(planes), verticesOfPlanes</code>
 
             <p style=text-align:justify;>Generally, there exits 2 ways of encoding for .ply files : ASCII and binary. The former can be read directly while the latter needs to be decoded through a particular procedure. Since files obtained by a Intel device are always encoded in binary mode, this will be the only mode support by our file reader.</p >
 
-            <pre>
-		<code class="language-go">if name == "vertex" {
+            <pre >
+<code class="language-go">if name == "vertex" {
 	// grab vertex elements
 	for i := 0; i < num_elems; i++ {
 		plyfile.PlyGetElement(cplyfile, &vlist[i], unsafe.Sizeof(plyfile.VertexMono{}))
@@ -412,14 +412,16 @@ return planes, len(planes), verticesOfPlanes</code>
 		FaceBuf := plyfile.Face{int(binary.LittleEndian.Uint32(flist[i].Vert1[:])), int(binary.LittleEndian.Uint32(flist[i].Vert2[:])), int(binary.LittleEndian.Uint32(flist[i].Vert3[:]))}
 		faces = append(faces, FaceBuf)
 	}
-}
-</code>
-		</pre>
+}</code>
+</pre >
+
             <p style=text-align:justify></p>
 
             <p style=text-align:justify;>For each triple of 3d coordinates, decode according to the proper coding method (Little / Big Endian).</p >
+
+
             <pre>
-		<code class="language-go">func PlyGetElement(plyfile *PlyFile, element interface{}, size uintptr) {
+<code class="language-go">func PlyGetElement(plyfile *PlyFile, element interface{}, size uintptr) {
 	switch plyfile.file_type {
 	case PLY_BINARY_LE:
 		buffbytes := make([]byte, size)
@@ -434,7 +436,7 @@ return planes, len(planes), verticesOfPlanes</code>
 		_ = binary.Read(r, binary.BigEndian, element)
 	}
 }</code>
-		</pre>
+</pre>
 
             <p style=text-align:justify></p>
 
@@ -456,7 +458,7 @@ return planes, len(planes), verticesOfPlanes</code>
 
 
             <pre>
-		<code class="language-go">if name == "vertex" {
+<code class="language-go">if name == "vertex" {
 	// read all the vertices
 	vlisthuge := make([]float32, num_elems * 3)
 	plyfile.PlyGetElementHuge(cplyfile, &vlisthuge, len(vlisthuge) * 4)
@@ -517,39 +519,39 @@ return planes, len(planes), verticesOfPlanes</code>
 
             <p style=text-align:justify;>Meanwhile, the procedure of processing each piece of data is independent one from another. Thus, theoretically, this can be perfectly parallelized according to Amdahl's Law. </p >
 
-            <pre>
-		<code class="language-go">if modeProc == 2 {
-	// modeProc new reader 32 bit
-	for _, file := range files {
-		// compose the filename
-		log.Println(location + file)
-		// read data
-		vlist, _ := reader.ReadPLYMono32Huge1(location + file)
-		// compute planes
-		Planes, numPlanes, _ := calculator.PlaneMonoConsecRANSAC32(vlist, 0.02, 0.1, 500, 0.1, 6000, 2000, 500)
-		// output of the data
-		log.Println("The number of planes detected : ", numPlanes)
-		for _, i := range Planes {
-			log.Println(i)
-		}
-		log.Println("\n")
-		go func(file string, location string, wg *sync.WaitGroup) {
-			defer wg.Done()
+<pre>
+<code class="language-go">if modeProc == 2 {
+    // modeProc new reader 32 bit
+    for _, file := range files {
+        // compose the filename
+        log.Println(location + file)
+        // read data
+        vlist, _ := reader.ReadPLYMono32Huge1(location + file)
+        // compute planes
+        Planes, numPlanes, _ := calculator.PlaneMonoConsecRANSAC32(vlist, 0.02, 0.1, 500, 0.1, 6000, 2000, 500)
+        // output of the data
+        log.Println("The number of planes detected : ", numPlanes)
+        for _, i := range Planes {
+            log.Println(i)
+        }
+        log.Println("\n")
+        go func(file string, location string, wg *sync.WaitGroup) {
+            defer wg.Done()
 
-			errC := Compressor.Compress("/home/liu/Desktop/Stages/gogs/src/dataprocessing/gzoutput/" + file + ".gz", location + file, modeComp)
-			if errC != nil {
-				panic(errC)
-			}
-			errR := os.Remove(location + file)
-			if errR != nil {
-				panic(errR)
-			}
-			log.Println("Compressed : ", file)
-		}(file, location, &wg)
-	}
+            errC := Compressor.Compress("/home/liu/Desktop/Stages/gogs/src/dataprocessing/gzoutput/" + file + ".gz", location + file, modeComp)
+            if errC != nil {
+                panic(errC)
+            }
+            errR := os.Remove(location + file)
+            if errR != nil {
+                panic(errR)
+            }
+            log.Println("Compressed : ", file)
+        }(file, location, &wg)
+    }
 }
 wg.Wait()</code>
-		</pre>
+    </pre>
             <p style=text-align:justify;></p >
 
             <p style=text-align:justify;>We use goroutines add concurrency to the computation. we lance a goroutine for each .ply file found, without a imposing a limit of the maximal existing goroutines. Another benchmark is done on the x86 platform. With the identical parameters and data, it takes 9.186s to complete the iterations without goroutines concurrency and 3.860s within. The speedup gained by adding the concurrency is about 2.380</p >
