@@ -35,7 +35,7 @@
 								<li><a href="#Detailed" id="about-link">核心算法</a></li>
 								<li><a href="#Benchmarks" id="bench-link">数据读取</a></li>
 								<li><a href="#Process" id="robusty">基准测试</a></li>
-								<li><a href="#Paral" id="paral">并行化</a></li>
+								<li><a href="#Paral" id="parall">并发优化</a></li>
 								<li><a href="#Futur" id="fut-link">后续工作</a></li>
 								<li><a href="#Ref" id="ref-link">参考文献</a></li>
 							</ul>
@@ -102,7 +102,7 @@
 
 						<p style=text-align:justify;>这里使用通过Intel深感设备获得的，不含有纹理信息的.ply点云文件作为程序的输入。如果使用其它方式获得的数据，由于header头文件和数据存储格式的差异，可能需要对程序进行一定的调整。</p >
 						<a href="#" class="image featured"><img src="images/Screenshot.png" alt="" /></a>
-						<p style=text-align:justify;>可以看到，与头文件不同，数据主体部分以二进制的方式存储，且点与点之间没有空格或换行符。读取文件时，先对头文件进行语义分析并提取相关信息，再对数据主题进行读取。</p >
+						<p style=text-align:justify;>可以看到，与头文件不同，数据主体部分以二进制的方式存储，且点与点之间没有空格或换行符。读取文件时，先对头文件进行语义分析并提取相关信息，再对数据主体进行读取。</p >
 
 					</div>
 				</section>
@@ -417,7 +417,7 @@ return planes, len(planes), verticesOfPlanes</code>
 		</pre>
 						<p style=text-align:justify></p>
 
-						<p style=text-align:justify;>对于读入的每组数据，根据二进制编码方式进行解码。</p >
+						<p style=text-align:justify;>对于读入的每组数据，根据二进制编码方式（Little / Big Endian）进行解码。</p >
 						<pre>
 		<code class="language-go">func PlyGetElement(plyfile *PlyFile, element interface{}, size uintptr) {
 	switch plyfile.file_type {
@@ -488,59 +488,15 @@ return planes, len(planes), verticesOfPlanes</code>
 							<h2>4. 基准测试</h2>
 						</header>
 
-						<p style=text-align:justify;>基准测试包含了文件读取部分和数据处理部分，应计划要求，在最后加入了文件压缩函数，使用Golang自带的gzip库进行压缩工作。经过测试，发现使用3作为压缩比参数能达到最理想的性能（压缩比 / 时间）。基准测试的平台包括笔记本x86和Raspberry3，详细结果如下。</p >
+						<p style=text-align:justify;>基准测试包含了文件读取部分和数据处理部分，应计划要求，在最后加入了文件压缩函数，使用Golang自带的gzip库进行压缩工作。详细结果如下，经过测试，发现使用3作为压缩比参数能达到最理想的性能（压缩比 / 时间）。</p >
 
-
-
-
-
-
-
-						<p style=text-align:justify;>2，重启进程时自动使用上次设置的变量，根据目标数据量和已保存的数据量自动计算还需保存的数据量。
-						</p >
-						<pre>
-<code class="language-bash">#!/bin/bash
-while true
-do
-  # find a particular process, excluding this process itself
-  ps -ef | grep "datasaving" | grep -v "grep" | grep -v "nautilus"
-# compare the returned value with 1 (the process is found or not)
-  if [  "$?" -eq 1  ]
-  then
-    # read all lines in parameters' file into an array
-    mapfile data &lt;parameters.txt
-
-			# extract the 2 parameters
-			n="${data[0]}"
-			i="${data[1]}"
-
-			# check if all works are done
-			if [  $n -eq 0  ]
-			then
-			exit 0
-			fi
-
-			# length of the array
-			leng=${#data[@]}
-
-			# calculate how many groups of data is there to be saved yet
-			if [ $n -ne -1 ]; then n=$((n - leng + 2)); fi
-
-			# restart the process
-			(./datasaving -i $i -n $n)
-    echo "process restarted"
-
-  else
-    echo "process exists"
-  fi
-  sleep 10
-done</code>
-</pre>
+						<a href="#" class="image featured"><img src="images/3.png" alt="" /></a>
 
 						<p style=text-align:justify;></p >
 
-						<p style=text-align:justify;>测试：手动kill数据保存进程后可以自动重新启动。如果需要进入系统后自动进行数据保存则需要将此.bash程序加入rc.local文件</p >
+						<p style=text-align:justify;>在章节3.3中，通过对数据读取函数的优化，我们有效地提高了函数的运行效率。这里，我们使用qemu模拟了在arm1176处理器上运行的Raspberry虚拟机，探究在较低性能的ARM处理器下该优化可能获得的性能提升。可以看到，在低性能环境下，通过这种方式获得的性能提升可能会更加可观。</p >
 
+						<a href="#" class="image featured"><img src="images/4.png" alt="" /></a>
 
 					</div>
 				</section>
@@ -548,20 +504,89 @@ done</code>
 
 
 				<!-- Ref -->
-				<section id="Ref" class="seven">
+				<section id="Paral" class="seven">
 					<div class="container">
 
 						<header>
-							<h2>5.参考文献</h2>
+							<h2>5.并发优化</h2>
 						</header>
-						<p style=text-align:justify;><a href="https://github.com/IntelRealSense/librealsense/issues/2488#issuecomment-427814215">https://github.com/IntelRealSense/librealsense/issues/2488#issuecomment-427814215</a>
-							<a href="https://github.com/IntelRealSense/librealsense/tree/master/examples/save-to-disk">https://github.com/IntelRealSense/librealsense/tree/master/examples/save-to-disk</a></p >
+
+						<p style=text-align:justify;>考虑以下场景：数据输入端持续采集并保存数据，由于采集速度远大于数据分析速度，容易处理不完，造成堆积。对于每个点云文件的分析是独立的进程，并不依赖于其它文件，因此在理想状态下可以完美并行化（Amdahl’s Law）。在实际应用中，体现为可以方便地并行处理每个文件，获得性能提升。</p >
+
+						<pre>
+		<code class="language-go">if modeProc == 2 {
+	// modeProc new reader 32 bit
+	for _, file := range files {
+		// compose the filename
+		log.Println(location + file)
+		// read data
+		vlist, _ := reader.ReadPLYMono32Huge1(location + file)
+		// compute planes
+		Planes, numPlanes, _ := calculator.PlaneMonoConsecRANSAC32(vlist, 0.02, 0.1, 500, 0.1, 6000, 2000, 500)
+		// output of the data
+		log.Println("The number of planes detected : ", numPlanes)
+		for _, i := range Planes {
+			log.Println(i)
+		}
+		log.Println("\n")
+		go func(file string, location string, wg *sync.WaitGroup) {
+			defer wg.Done()
+
+			errC := Compressor.Compress("/home/liu/Desktop/Stages/gogs/src/dataprocessing/gzoutput/" + file + ".gz", location + file, modeComp)
+			if errC != nil {
+				panic(errC)
+			}
+			errR := os.Remove(location + file)
+			if errR != nil {
+				panic(errR)
+			}
+			log.Println("Compressed : ", file)
+		}(file, location, &wg)
+	}
+}
+wg.Wait()</code>
+		</pre>
+						<p style=text-align:justify;></p >
+
+						<p style=text-align:justify;>这里使用goroutines进行并发计算，不限制最大的goroutines数量，和waitgroup进行线程同步。在与前文相同的x86平台上进行了基准测试以比较和普通模式下的性能差异。使用相同的处理、压缩参数和数据文件，普通模式下耗时9.186s，并发模式耗时3.860s，加速比约为2,380.</p >
+
+						<p style=text-align:justify;>在其他的优化方面，尝试了将全局浮点数类型从64位改为32位以观察在32位Raspberry设备上的性能表现，性能差异极小，怀疑可能是误差。用快速平方根算法替代goNum库内的平方根算法，造成性能损失，也被放弃。</p >
+
+
 					</div>
 				</section>
 
 
+				<!-- Ref -->
+				<section id="Futur" class="eight">
+					<div class="container">
+
+						<header>
+							<h2>6. 后续工作</h2>
+						</header>
+
+						<p style=text-align:justify;>RANSAC算法简单易用，便于理解，但是也有其局限性。计算结果在很大程度上依赖于参数的选择和随机选择的数据点的质量，对于单个场景需要重复计算来获得一个收敛于均值的结果。此外，对于复杂场景的处理能力不佳，需要反复调整参数。</p >
+
+						<p style=text-align:justify;>可以考虑引入其他算法构建结合体，例如区域增长或平均法向量分析。建议参考OpenCV中类似算法的设计。</p >
+
+					</div>
+				</section>
+
+				<!-- Ref -->
+				<section id="Ref" class="nine">
+					<div class="container">
 
 
+					<header>
+					<h2>7. 参考文献</h2>
+				</header>
+
+				<p style=text-align:justify;><a href="https://halshs.archives-ouvertes.fr/halshs-00264839/document">https://halshs.archives-ouvertes.fr/halshs-00264839/document</a> Automatic segmentation of building facades using Terrestrial Laser Data</p >
+
+				<p style=text-align:justify;><a href="http://hhoppe.com/recon.pdf ">http://hhoppe.com/recon.pdf </a> Surface Reconstruction from Unorganized Points</p >
+
+			</div>
+</section>
 
 			</div>
 
@@ -570,7 +595,7 @@ done</code>
 
 			<!-- Copyright -->
 			<ul class="copyright">
-				<li>&copy; Zhiyuan LIU. All rights reserved.</li>
+				<li>&copy; Zhiyuan LIU. All rights reserved.<a href="https://cheer-yuan.github.io/PlyRansacPlaneAnalyse/ch.html">CH</a> <a href="https://cheer-yuan.github.io/PlyRansacPlaneAnalyse/en.html">EN</a></li>
 			</ul>
 
 		</div>

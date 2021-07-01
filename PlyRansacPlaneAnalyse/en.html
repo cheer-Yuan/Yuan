@@ -4,7 +4,7 @@
 -->
 <html>
 <head>
-    <title>改进RANSAC算法的点云平面分析</title>
+    <title>Use improved RANSAC to analyse planes from a point cloud file</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
     <link rel="stylesheet" href="../assets/css/main.css" />
@@ -31,10 +31,12 @@
         <nav id="nav">
             <ul>
                 <li><a href="#General" id="top-link">综述</a></li>
-                <li><a href="#started" id="portfolio-link">环境准备</a></li>
-                <li><a href="#Detailed" id="about-link">实现方法</a></li>
-                <li><a href="#Benchmarks" id="bench-link">基准测试</a></li>
-                <li><a href="#Process" id="robusty">可靠性改进</a></li>
+                <li><a href="#started" id="portfolio-link">数据准备</a></li>
+                <li><a href="#Detailed" id="about-link">核心算法</a></li>
+                <li><a href="#Benchmarks" id="bench-link">数据读取</a></li>
+                <li><a href="#Process" id="robusty">基准测试</a></li>
+                <li><a href="#Paral" id="parall">并发优化</a></li>
+                <li><a href="#Futur" id="fut-link">后续工作</a></li>
                 <li><a href="#Ref" id="ref-link">参考文献</a></li>
             </ul>
         </nav>
@@ -81,12 +83,12 @@
         <div class="container">
 
             <header>
-                <h2 class="alt">使用Intel Realsense2 SDK 及 L515激光雷达或 D455深感相机自动保存.ply格式的深度点云信息文件</h2>
-                <p>需求：对cMake，C++，点云格式以及 Realsense2 SDK 的基本了解</p>
+                <h2 class="alt">Use a simple, improved and high-speed RANSAC algorithm to analyse planes from a .ply point cloud file</h2>
+                <p>Pre-requisite: Basic knowledge on Golang, point cloud files in .ply and the least square regression method</p>
             </header>
 
 
-            <p style=text-align:justify;>实验项目需要使用Raspberry树莓派终端连接Intel深感设备来采集静态的点云文件，对采集速度和程序稳定性有要求，越快越好。此处选择使用c++搭配Realsense2 SDK进行开发，并且为最大化数据采集速度，对SDK进行了修改以保存没有纹理信息的点云文件，分别在笔记本x86平台与Raspberry ARM平台进行测试。</p >
+            <p style=text-align:justify;>使用一种改进的RANSAC算法对点云文件进行分析并得到其中所含的平面数量和每个平面的一般式方程 (ax + by + cz = d)。同时开发了原生Golang的点云文件读取和写入程序，并进行了性能优化。</p >
         </div>
     </section>
 
@@ -98,14 +100,9 @@
                 <h2>1. 环境准备</h2>
             </header>
 
-            <p style=text-align:justify;>根据<a href="https://dev.intelrealsense.com/docs/installation">教程</a>下载，编译并安装 Realsense2 SDK。如不需要省略纹理信息，可以安装<a href="https://github.com/IntelRealSense/librealsense/releases/tag/v2.45.0">官方版本</a>的SDK（不排除在本文章发布后官方更新类似功能），否则在<a href="https://github.com/cheer-Yuan/datasaving">这里下载</a>修改后的SDK（仅测试于linux，内核版本不晚于5.4.0）。</p >
-            <p style=text-align:justify;>如果已经安装官方版本，使用下列命令重新安装另一版本，建议添加多核编译命令以节约时间。</p >
-            <pre>
-<code class="language-bash">mkdir build && cd build
-cmake ../ -DCMAKE_BUILD_TYPE=Release
-sudo make uninstall && make clean && make && sudo make install</code>
-</pre>
-
+            <p style=text-align:justify;>这里使用通过Intel深感设备获得的，不含有纹理信息的.ply点云文件作为程序的输入。如果使用其它方式获得的数据，由于header头文件和数据存储格式的差异，可能需要对程序进行一定的调整。</p >
+            <a href="#" class="image featured"><img src="images/Screenshot.png" alt="" /></a>
+            <p style=text-align:justify;>可以看到，与头文件不同，数据主体部分以二进制的方式存储，且点与点之间没有空格或换行符。读取文件时，先对头文件进行语义分析并提取相关信息，再对数据主体进行读取。</p >
 
         </div>
     </section>
@@ -115,103 +112,189 @@ sudo make uninstall && make clean && make && sudo make install</code>
         <div class="container">
 
             <header>
-                <h2>2. 实现方法</h2>
+                <h2>2. 核心算法</h2>
+            </header>
+            <header>
+                <h3 style=text-align:justify>2.1 起始</h3>
+            </header>
+
+            <p style=text-align:justify>随机采样一致（Random SAmple Consensus）的实质是随机选取一些能够建立所需模型的样本点，构建模型，并判断该模型是否满足需求，循环重复直至满足退出条件。这里的目的是从点云中拟合平面，所以取三个随机点，并计算平面。</p>
+
+            <p style=text-align:justify>首先，从点云中选取一定数量的子集作为平面的候选点。为了在重复迭代时节省时间，这里使用原数据的一个随机子集进行计算，减少计算量。子集的点的数量将影响计算速度。</p>
+            <pre>
+<code class="language-go">// pick a batch of n vertices randomly from the vertex slice
+vertexBatch := make([]plyfile.VertexMono, 0)
+indexBatch := make([]int, 0)
+for {
+	indexRandom := r.Intn(len(vlist))
+
+	// check if this vertex is already chosen. If not, append the vertex and its index to the batch
+	if mymath.ExistIntList(indexBatch, indexRandom) {...}
+	vertexBatch = append(vertexBatch, vlist[indexRandom])
+	indexBatch = append(indexBatch, indexRandom)
+	// end condition
+	if len(vertexBatch) == volumeBatch {...}
+}</code>
+</pre>
+            <p style=text-align:justify></p>
+
+            <header>
+                <h3 style=text-align:justify>2.2 RANSAC迭代</h3>
             </header>
 
 
-            <p style=text-align:justify>手动设置深度流的分辨率并开启信息流，此处取最小分辨率以最大化数据获取速度，不同型号的设备支持的分辨率会有不同，例如L515的最低深度分辨率为360*240而D455则为424*240。默认的深感分辨率约为640*480，所以取最小值时的数据处理量约为默认值的1/4。</p>
+            <p style=text-align:justify>随机选取三个点并形成平面，计算上一步的子集中的所有点和此平面的距离，如果距离小于给定值则记为内点，否则记为外点。如果内点的数量达到一定比例，则认为此平面存在，放入验证组。如果没有达到此比例，则重新选择三个点并计算。如果达到一定迭代次数仍未找到拥有内点的数量达到一定比例的平面，则返回拥有内点数量最多的平面。</p>
 
             <pre>
-<code class="language-cpp">rs2::pipeline pipe;
-rs2::config cfg;
-if (config.if_lowres() == 0) {
-    cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_ANY, 0);
-} else if (config.if_lowres() == 5) {
-    cfg.enable_stream(RS2_STREAM_DEPTH, 424, 240, RS2_FORMAT_ANY, 0);
-} else {
-    cfg.enable_stream(RS2_STREAM_DEPTH, 320, 240, RS2_FORMAT_ANY, 0);
+<code class="language-go">// pick 3 vertices randomly
+	p1 := 0
+	p2 := 0
+	p3 := 0
+	// check if the 3 vertices are different one from another
+	for {...}
+
+	// calculate the inlines for the plane formed by these 3 vertices (if the distance to the plane is inferior to the given threshold, this point would be regarded as inline) and take the score
+	p := New_p_by_verticesMono(vlist[p1], vlist[p2], vlist[p3])
+	for _, vertex := range vlist {
+		if mymath.DistPointPlane(vertex.Ply_x, vertex.Ply_y, vertex.Ply_z, p.A, p.B, p.C, p.D) < minDistance {...}
+	}
+	NumIteration += 1
+
+	// update the score (inline rate). If there is a higher score, note down the plane and 3 vertices which forms it
+	score := InlineCount / float64(n)
+	if score > highscore {...}
+
+	// quit condition : the high score surpass the given parameter, or the number of iteration reach the maximal given in parameter too
+	if NumIteration > minNforLoop && highscore > minScore || NumIteration >= maxNforLoop {...}
 }
-pipe.start(cfg);</code>
+</code>
 </pre>
 
             <p style=text-align:justify></p>
 
+            <header>
+                <h3 style=text-align:justify>2.3 全局拟合</h3>
+            </header>
 
-            <p style=text-align:justify>获取深度帧和图像帧，为之后根据输入的参数决定保存哪些数据作准备，这样如果只保存点云文件的话就可以省略其他数据以最大化数据获取速度。</p>
+            <p style=text-align:justify>计算上一步中得到的平面到所有点的距离，将小于给定距离的点记为全局内点，使用所有全局内点通过最小二乘法拟合一个新的平面，并将此平面放入平面池，同时将全局内点移出下次迭代使用的数据集。</p>
 
             <pre>
-<code class="language-cpp">rs2::frameset frames = pipe.wait_for_frames();
-auto depth = frames.get_depth_frame();
-auto color = frames.get_color_frame();</code>
+<code class="language-go">// Fit several points to x plane, using the least square method by solving a linear system Ax=b
+. A : matrix of the size n rows and 3 columns. Rows are (xi, yi, 1) in which xi and yi are coordinates x and y of the points
+A := mat.NewDense(n, 3, nil)
+// B : matrix of the size n rows and 1 columns, (zi), the coordinates z of the points
+b := mat.NewDense(n, 1, nil)
+// initializing
+for i := 0; i < n; i++ {
+	A.Set(i, 0, vlist[i].Ply_x)
+	A.Set(i, 1, vlist[i].Ply_y)
+	A.Set(i, 2, 1)
+	b.Set(i, 0, vlist[i].Ply_z)
+}
+
+//  compute : A * x = b --> ATA * x = AT * b --> x = (ATA)^-1 * AT * b
+
+AT := A.T()
+// multiply A by AT at the left side to prepare for the inverse
+var ATA mat.Dense
+ATA.Mul(AT, A)
+
+// compute the inverse
+var ATAInv mat.Dense
+err := ATAInv.Inverse(&ATA)
+if err != nil {
+	log.Fatalf("A is not invertible: %v", err)
+}
+
+var ATAInvAT mat.Dense
+ATAInvAT.Mul(&ATAInv, AT)
+var X mat.Dense
+X.Mul(&ATAInvAT, b)
+
+P := New_p(X.At(0, 0), X.At(1, 0), -1, X.At(2, 0))
+return P</code>
 </pre>
 
             <p style=text-align:justify></p>
 
-            <p style=text-align:justify>根据使用者输入的参数决定是否保存纹理信息， export_to_ply_notexture为新加入SDK的函数。</p>
+            <header>
+                <h3 style=text-align:justify>2.4 重复检测</h3>
+            </header>
+
+            <p style=text-align:justify>检测是否存在重复的平面。对于所有平面池内的平面，两两计算夹角，如夹角小于给定值，则视为平行，计算平面距离，如再小于给定值，则确认重复。使用两平面所有的内点以最小二乘法拟合出新的平面，替代两平面放入平面池。</p>
 
             <pre>
-<code class="language-cpp">if (ifColor == 1) {
-    // Map the point cloud to the given color frame
-    pc.map_to(color);
-    // Generate the point cloud
-    rs2::points points = pc.calculate(depth);
-    // Export the point cloud to a PLY file with colors
-    points.export_to_ply(ply_file.str(), color);
-} else if (ifColor == 0) {
-    // Generate the point cloud
-    rs2::points points = pc.calculate(depth);
-    // Export the point cloud to a PLY file without colors
-    points.export_to_ply_notexture(ply_file.str());
-} </code>
+<code class="language-go">// check that if the new plane belongs to the same planar facade as one of the planes already obtained. If it is the case, mix the vertices and re-adjust the two planes using least square method
+if len(planes) > 0 {
+	for index, planeObtained := range planes {
+		// first check : if the angle formed by the two planes are inferior to the given value
+		// second check : if the average distance from the points forming the old plane and the new plane is inferior to the given value
+		if mymath.VectorsAngle32(planeObtained.A, planeObtained.B, planeObtained.C, newP.A, newP.B, newP.C) < maxAnglePlanes && planeObtained.DistAvrPointPlaneMono32(vetexInline) < 4 * maxDistance {...}
+	}
+}
+
+// if vetexInline != nil (empty slice) means that no similar planes found, we add the new plane to the slice. Otherwise there was a similar plane
+if vetexInline != nil {...}
+
+// remove the inline points from the original slice, color these vertices and move them to a new slice to prepare for the painting
+for i, index := range indexInline {
+	vlist[index], vlist[len(vlist) - 1 - i] = vlist[len(vlist) - 1 - i], vlist[index]
+}
+
+vlist = append(vlist[:0], vlist[0:len(vlist) - inlineCount]...)
+</code>
 </pre>
 
             <p style=text-align:justify></p>
 
-            <p style=text-align:justify>根据输入的参数决定是否保存图像信息。默认会保存深度，红外和普通照片三种图像文件以及点云文件。为最大化数据保存速度，此处我们可以选择只保存点云文件。</p>
+            <header>
+                <h3 style=text-align:justify>2.5 退出条件</h3>
+            </header>
+
+
+            <p style=text-align:justify>迭代以上所有步骤，直到迭代次数大于给定值或剩余外点数量小于给定值，返回平面数量，所有平面方程和剩余外点数量。</p>
 
             <pre>
-<code class="language-cpp">for (auto&& frame : frames)
-{
-    // We can only save video frames as pngs, so we skip the rest
-    if (auto vf = frame.as&lt;rs2::video_frame>())
-    {
-        // Use the colorizer to get an rgb image for the depth stream
-        if (vf.is&lt;rs2::depth_frame>()) vf = color_map.process(frame);
-
-        // Write the corresponding images to disk, according to the given parameters
-        std::stringstream png_file;
-
-        if (vf.get_profile().stream_name() == "Depth") {
-            if (ifDepth) {
-                png_file << direction << currenttime << vf.get_profile().stream_name() << ".png";
-                stbi_write_png(png_file.str().c_str(), vf.get_width(), vf.get_height(), vf.get_bytes_per_pixel(), vf.get_data(), vf.get_stride_in_bytes());
-                std::cout << "Saved " << png_file.str() << std::endl;
-
-                // Record the metadata
-                std::stringstream csv_file;
-                csv_file << direction << currenttime << vf.get_profile().stream_name()
-                         << "-metadata.csv";
-                metadataToCsv(vf, csv_file.str());
-            }
-        }
-
-        if (vf.get_profile().stream_name() == "Infrared") {
-            if (ifInfr) {...}
-        }
-
-        if (vf.get_profile().stream_name() == "Color") {
-            if (ifImages) {...}
-        }
-    }
-} </code>
+<code class="language-go">// decide whether the iteration continues
+numIter++
+if len(vlist) < maxVtoQuit || numIter > iterMax {
+	ifContinue = false
+}
+return planes, len(planes), verticesOfPlanes</code>
 </pre>
+
 
             <p style=text-align:justify></p>
 
-            <p style=text-align:justify>保存后的点云文件可以使用meshlab等软件浏览编辑，或作为各种分析算法的输入数据。详细的数据构成会在下一篇讨论对点云文件进行几何平面分析的文章进行介绍。</p>
+            <header>
+                <h3 style=text-align:justify>2.6 参数</h3>
+            </header>
 
-            <a href="#" class="image featured"><img src="images/pcexample.png" alt="" /></a>
+            <p style=text-align:justify>主要参数如下，需要根据点云的类型手动调整。</p>
+            <pre>
+<code class="language-go">func PlaneMonoConsecRANSAC32(
+	vlist []plyfile.VertexMono,	//所有的点（全集）
+	maxDistance float32, 		//平面与内点的最大距离
+	minScoreforRAN float32,		//平面的内点在子集中的最低比例
+	minVforPlane int,			//一个平面在全集中最低内点数量
+	maxAnglePlanes float32,		//平行平面的最大夹角
+	maxVtoQuit int,				//程序结束时不属于任何平面的点的最大数量
+	iterMax int,				//程序结束前的最多迭代次数
+	volumeBatch int 			//构成子集的点的数量
+	) ([]Plane32, int, [][]plyfile.VertexMono)</code>
+</pre>
+            <p style=text-align:justify></p>
+            <p style=text-align:justify>例如 ：</p>
 
+            <pre>
+<code class="language-go">Planes, numPlanes, _ := calculator.PlaneMonoConsecRANSAC32(vlist, 0.003,
+																0.1,
+																500,
+																0.1,
+																50,
+																80,
+																500)</code>
+</pre>
 
         </div>
     </section>
@@ -223,36 +306,177 @@ auto color = frames.get_color_frame();</code>
         <div class="container">
 
             <header>
-                <h2>3.基准测试</h2>
+                <h2>3. 数据读取</h2>
             </header>
 
-            <p style=text-align:justify;>这里做一些基础的测试以对比默认保存方式和改进后的数据保存方式在速度上的差别。先进行x86平台的基准测试，计算每次保存的平均用时。</p >
-            <p style=text-align:justify;>平台配置：Ubuntu 20.04.2 LTS 5.4.0-70-generic，i5-1035G7 CPU @ 1.20GHz，NVMe Micron CT1000P1SSD8</p >
-            <p style=text-align:justify;>普通方式（保存三个图片文件以及一个默认配置的点云文件）：0.8s</p >
+            <p style=text-align:justify;>在准备数据的读取程序时，我们发现，现有使用Golang的.ply点云读取算法是基于cgo的，使用的时调用c语言库进行编译，在代码可读性，和易用性上作的都不是很好。语言间的互相调用也会损失性能，编写和使用方式都非常不优雅。于是我决定开发原生基于Golang的.ply点云读取程序。</p >
+
+            <header>
+                <h3 style=text-align:justify>3.1 语法分析</h3>
+            </header>
+
+            <p style=text-align:justify;>语法分析的作用主要在于从headers头文件提取有用的信息，例如二进制编码方式，点的数量，点的数据构成和数据类型，面的数量等等。这里的语法分析器可以识别任意构成的头文件，只要其遵循基本.ply文件的headers的语法。语法分析的核心代码如下。</p >
+
+            <pre >
+<code class="language-go">for _, i := range lines {
+	split := strings.Fields(i)
+	switch split[0] {
+	// define the format
+	case "format":
+		version, _ = strconv.ParseFloat(split[2], 64)
+		switch split[1] {
+		case "ascii":
+			file_type = PLY_ASCII
+		case "binary_little_endian":
+			file_type = PLY_BINARY_LE
+		case "binary_big_endian":
+			file_type = PLY_BINARY_BE
+		}
+
+	// add comment
+	case "comment":
+		comments = append(comments, i[8:])
+
+	// add obj_info
+	case "obj_info":
+		if len(split) > 1 {
+			for i := 1; i < len(split); i++ {
+				obj_info = append(obj_info, split[i])
+			}
+		}
+
+	//  add a new element
+	case "element":
+		// if we meet a new element and we have edited the properties of an element : we pack this element and add it in to the slice
+		if prop_edited == true {
+			elems = append(elems, *New_element(ele_name, ele_num, props))
+			prop_edited = false
+			props = nil
+		}
+		ele_name = split[1]
+		ele_num, _ = strconv.Atoi(split[2])
+
+	case "property":
+		// if this line describes a property list : the second keyword will be "list", the third keyword will describe the type of first data (length of the list) and the fourth keyword for the rest data
+		var isList, count, typ int
+		var name string
+		if split[1] == "list" {
+			isList = 1
+			count = TypeConverter(split[2])
+			typ = TypeConverter(split[3])
+			name = split[4]
+		} else {
+			isList = 0
+			count = 0
+			typ = TypeConverter(split[1])
+			name = split[2]
+		}
+		prop := New_property(name, typ, typ, 0, isList, count, count, 0)
+		props = append(props, *prop)
+
+		// indicate whether the property is modified
+		prop_edited = true
+
+	case "end_header":
+		// we pack the last element and add it in to the slice
+		elems = append(elems, *New_element(ele_name, ele_num, props))
+	}
+}</code>
+</pre >
+
+            <p style=text-align:justify></p>
+
+            <header>
+                <h3 style=text-align:justify>3.2 文件读取</h3>
+            </header>
+
+
+
+
+            <p style=text-align:justify;>众所周知，.ply文件存在两种编码方式，即ASCII与二进制。前者可以直接作为数字被读取，而后者需要经过解码函数作为二进制输出。由于目标文件的编码方式为二进制，这里只开发了二进制的读取和写入功能。</p >
+
             <pre>
-		<code class="language-bash"> ./datasaving -r 1 -d 1 -f 1 -c 1 -l 0</code>
+		<code class="language-go">if name == "vertex" {
+	// grab vertex elements
+	for i := 0; i < num_elems; i++ {
+		plyfile.PlyGetElement(cplyfile, &vlist[i], unsafe.Sizeof(plyfile.VertexMono{}))
+		vertices = append(vertices, vlist[i])
+	}
+
+} else if name == "face" {
+	// grab face elements
+	for i := 0; i < num_elems; i++ {
+		plyfile.PlyGetElement(cplyfile, &flist[i], unsafe.Sizeof(plyfile.FaceReading{}))
+
+		// extract integers from binary listst and export to a slice of faces
+		FaceBuf := plyfile.Face{int(binary.LittleEndian.Uint32(flist[i].Vert1[:])), int(binary.LittleEndian.Uint32(flist[i].Vert2[:])), int(binary.LittleEndian.Uint32(flist[i].Vert3[:]))}
+		faces = append(faces, FaceBuf)
+	}
+}
+</code>
 		</pre>
             <p style=text-align:justify></p>
 
-            <p style=text-align:justify;>只保存默认配置的点云文件：0.55s</p >
+            <p style=text-align:justify;>对于读入的每组数据，根据二进制编码方式（Little / Big Endian）进行解码。</p >
             <pre>
-		<code class="language-bash"> ./datasaving -c 1 -l 0</code>
+		<code class="language-go">func PlyGetElement(plyfile *PlyFile, element interface{}, size uintptr) {
+	switch plyfile.file_type {
+	case PLY_BINARY_LE:
+		buffbytes := make([]byte, size)
+		r := bytes.NewReader(buffbytes)
+		_, _ = plyfile.Fp.Read(buffbytes)
+		_ = binary.Read(r, binary.LittleEndian, element)
+
+	case PLY_BINARY_BE:
+		buffbytes := make([]byte, size)
+		r := bytes.NewReader(buffbytes)
+		_, _ = plyfile.Fp.Read(buffbytes)
+		_ = binary.Read(r, binary.BigEndian, element)
+	}
+}</code>
 		</pre>
 
             <p style=text-align:justify></p>
 
-            <p style=text-align:justify;>只保存省略纹理信息并缩小了分辨率的点云文件：0.1s</p >
-
-            <pre>
-		<code class="language-bash">./datasaving -l 1</code>
-		</pre>
+            <p style=text-align:justify;>程序最终输出一个由顶点构成的切片（数组）和一个由面构成的切片。</p >
 
             <p style=text-align:justify></p>
 
+            <header>
+                <h3 style=text-align:justify>3.3 初步测试和性能优化</h3>
+            </header>
 
-            <p style=text-align:justify;>对于一些不需要点云的颜色信息和分辨率的情况，数据的采样速度可以接近每秒十次，相对于普通保存方式的加速比达到800%。即使需要完整的点云文件以及图像文件，使用本程序也可以获得比官方保存方式（每次大于等于一秒，未验证）更快的保存速度。</p >
-            <p style=text-align:justify;>我们也在使用sd卡作为存储介质的Raspberry 3 上进行了测试，在保存最小文件的情况下，平均用时约为0.4s。考虑到其性能远低于x86平台，可以认为这是一个令人满意的结果。</p >
+            <p style=text-align:justify;>使用pprof对整个程序进行profiling，我们发现数据读取函数（下图右方的黄色部分）占用了近1/3的总时长，然而这部分代码并没有大量的计算。进一步分析代码，发现程序对与每个点或面的元素都调用了一次解码函数并从硬盘存储设备中读取数据，由于硬盘与处理器之间的bus通信延迟较长，从而产生了大量的无效等待时间。</p >
 
+            <a href="#" class="image featured"><img src="images/1.png" alt="" /></a>
+            <p style=text-align:justify></p>
+            <p style=text-align:justify>于是考虑减少从存储设备中读取数据的次数。在新版本中，尝试只调用一次读取函数，读取所有数据至内存，然后再调用解码函数。由于内存与处理器间的通信延迟远低于硬盘，可以节省大量等待时间，预计可以获得较大的性能提升。使用下面的代码重新构造读取函数。</p>
+
+
+            <pre>
+		<code class="language-go">if name == "vertex" {
+	// read all the vertices
+	vlisthuge := make([]float32, num_elems * 3)
+	plyfile.PlyGetElementHuge(cplyfile, &vlisthuge, len(vlisthuge) * 4)
+	vertices = append(vertices, vlisthuge...)
+
+} else if name == "face" {
+	// read all the faces
+	flisthuge := make([]byte, num_elems * 13)
+	_, _ = cplyfile.Fp.Read(flisthuge)
+
+	// decode the integers from the memory
+	for i := 0; i < num_elems; i++ {
+		f1, f2, f3 := int(binary.LittleEndian.Uint32(flisthuge[i * 13 + 1 : i * 13 + 5])), int(binary.LittleEndian.Uint32(flisthuge[i * 13 + 5 : i * 13 + 9])), int(binary.LittleEndian.Uint32(flisthuge[i * 13 + 9 : i * 13 + 13]))
+		faces = append(faces, f1, f2, f3)
+	}
+}</code>
+		</pre>
+            <p style=text-align:justify></p>
+
+            <p style=text-align:justify>可以看到，使用新的读取函数后，读取数据所占用的时间比例明显降低，整体速度从2,74s提升至1,92s，在没有优化计算部分的情况下获得了42,71%的性能提升。</p>
+
+            <a href="#" class="image featured"><img src="images/2.png" alt="" /></a>
         </div>
     </section>
 
@@ -261,56 +485,18 @@ auto color = frames.get_color_frame();</code>
         <div class="container">
 
             <header>
-                <h2>4. 可靠性</h2>
+                <h2>4. 基准测试</h2>
             </header>
 
-            <p style=text-align:justify;>对于在无人职守环境下类工业化的应用，考虑程序意外退出/断电重启等问题发生的可能性。设计一个.bash程序，目的：</p >
-            <p style=text-align:justify;>1，如果已保存的数据数量未达到目标数量，则持续监测后台进程，如发现进程消失（如意外退出或重启）则自动重新启动进程</p >
-            <p style=text-align:justify;>2，重启进程时自动使用上次设置的变量，根据目标数据量和已保存的数据量自动计算还需保存的数据量。
-            </p >
-            <pre>
-<code class="language-bash">#!/bin/bash
-while true
-do
-  # find a particular process, excluding this process itself
-  ps -ef | grep "datasaving" | grep -v "grep" | grep -v "nautilus"
-# compare the returned value with 1 (the process is found or not)
-  if [  "$?" -eq 1  ]
-  then
-    # read all lines in parameters' file into an array
-    mapfile data &lt;parameters.txt
+            <p style=text-align:justify;>基准测试包含了文件读取部分和数据处理部分，应计划要求，在最后加入了文件压缩函数，使用Golang自带的gzip库进行压缩工作。详细结果如下，经过测试，发现使用3作为压缩比参数能达到最理想的性能（压缩比 / 时间）。</p >
 
-			# extract the 2 parameters
-			n="${data[0]}"
-			i="${data[1]}"
-
-			# check if all works are done
-			if [  $n -eq 0  ]
-			then
-			exit 0
-			fi
-
-			# length of the array
-			leng=${#data[@]}
-
-			# calculate how many groups of data is there to be saved yet
-			if [ $n -ne -1 ]; then n=$((n - leng + 2)); fi
-
-			# restart the process
-			(./datasaving -i $i -n $n)
-    echo "process restarted"
-
-  else
-    echo "process exists"
-  fi
-  sleep 10
-done</code>
-</pre>
+            <a href="#" class="image featured"><img src="images/3.png" alt="" /></a>
 
             <p style=text-align:justify;></p >
 
-            <p style=text-align:justify;>测试：手动kill数据保存进程后可以自动重新启动。如果需要进入系统后自动进行数据保存则需要将此.bash程序加入rc.local文件</p >
+            <p style=text-align:justify;>在章节3.3中，通过对数据读取函数的优化，我们有效地提高了函数的运行效率。这里，我们使用qemu模拟了在arm1176处理器上运行的Raspberry虚拟机，探究在较低性能的ARM处理器下该优化可能获得的性能提升。可以看到，在低性能环境下，通过这种方式获得的性能提升可能会更加可观。</p >
 
+            <a href="#" class="image featured"><img src="images/4.png" alt="" /></a>
 
         </div>
     </section>
@@ -318,20 +504,89 @@ done</code>
 
 
     <!-- Ref -->
-    <section id="Ref" class="seven">
+    <section id="Paral" class="seven">
         <div class="container">
 
             <header>
-                <h2>5.参考文献</h2>
+                <h2>5.并发优化</h2>
             </header>
-            <p style=text-align:justify;><a href="https://github.com/IntelRealSense/librealsense/issues/2488#issuecomment-427814215">https://github.com/IntelRealSense/librealsense/issues/2488#issuecomment-427814215</a>
-                <a href="https://github.com/IntelRealSense/librealsense/tree/master/examples/save-to-disk">https://github.com/IntelRealSense/librealsense/tree/master/examples/save-to-disk</a></p >
+
+            <p style=text-align:justify;>考虑以下场景：数据输入端持续采集并保存数据，由于采集速度远大于数据分析速度，容易处理不完，造成堆积。对于每个点云文件的分析是独立的进程，并不依赖于其它文件，因此在理想状态下可以完美并行化（Amdahl’s Law）。在实际应用中，体现为可以方便地并行处理每个文件，获得性能提升。</p >
+
+            <pre>
+		<code class="language-go">if modeProc == 2 {
+	// modeProc new reader 32 bit
+	for _, file := range files {
+		// compose the filename
+		log.Println(location + file)
+		// read data
+		vlist, _ := reader.ReadPLYMono32Huge1(location + file)
+		// compute planes
+		Planes, numPlanes, _ := calculator.PlaneMonoConsecRANSAC32(vlist, 0.02, 0.1, 500, 0.1, 6000, 2000, 500)
+		// output of the data
+		log.Println("The number of planes detected : ", numPlanes)
+		for _, i := range Planes {
+			log.Println(i)
+		}
+		log.Println("\n")
+		go func(file string, location string, wg *sync.WaitGroup) {
+			defer wg.Done()
+
+			errC := Compressor.Compress("/home/liu/Desktop/Stages/gogs/src/dataprocessing/gzoutput/" + file + ".gz", location + file, modeComp)
+			if errC != nil {
+				panic(errC)
+			}
+			errR := os.Remove(location + file)
+			if errR != nil {
+				panic(errR)
+			}
+			log.Println("Compressed : ", file)
+		}(file, location, &wg)
+	}
+}
+wg.Wait()</code>
+		</pre>
+            <p style=text-align:justify;></p >
+
+            <p style=text-align:justify;>这里使用goroutines进行并发计算，不限制最大的goroutines数量，和waitgroup进行线程同步。在与前文相同的x86平台上进行了基准测试以比较和普通模式下的性能差异。使用相同的处理、压缩参数和数据文件，普通模式下耗时9.186s，并发模式耗时3.860s，加速比约为2,380.</p >
+
+            <p style=text-align:justify;>在其他的优化方面，尝试了将全局浮点数类型从64位改为32位以观察在32位Raspberry设备上的性能表现，性能差异极小，怀疑可能是误差。用快速平方根算法替代goNum库内的平方根算法，造成性能损失，也被放弃。</p >
+
+
         </div>
     </section>
 
 
+    <!-- Ref -->
+    <section id="Futur" class="eight">
+        <div class="container">
+
+            <header>
+                <h2>6. 后续工作</h2>
+            </header>
+
+            <p style=text-align:justify;>RANSAC算法简单易用，便于理解，但是也有其局限性。计算结果在很大程度上依赖于参数的选择和随机选择的数据点的质量，对于单个场景需要重复计算来获得一个收敛于均值的结果。此外，对于复杂场景的处理能力不佳，需要反复调整参数。</p >
+
+            <p style=text-align:justify;>可以考虑引入其他算法构建结合体，例如区域增长或平均法向量分析。建议参考OpenCV中类似算法的设计。</p >
+
+        </div>
+    </section>
+
+    <!-- Ref -->
+    <section id="Ref" class="nine">
+        <div class="container">
 
 
+            <header>
+                <h2>7. 参考文献</h2>
+            </header>
+
+            <p style=text-align:justify;><a href="https://halshs.archives-ouvertes.fr/halshs-00264839/document">https://halshs.archives-ouvertes.fr/halshs-00264839/document</a> Automatic segmentation of building facades using Terrestrial Laser Data</p >
+
+            <p style=text-align:justify;><a href="http://hhoppe.com/recon.pdf ">http://hhoppe.com/recon.pdf </a> Surface Reconstruction from Unorganized Points</p >
+
+        </div>
+    </section>
 
 </div>
 
@@ -340,7 +595,7 @@ done</code>
 
     <!-- Copyright -->
     <ul class="copyright">
-        <li>&copy; Zhiyuan LIU. All rights reserved.</li>
+        <li>&copy; Zhiyuan LIU. All rights reserved.<a href="https://cheer-yuan.github.io/PlyRansacPlaneAnalyse/ch.html">CH</a> <a href="https://cheer-yuan.github.io/PlyRansacPlaneAnalyse/en.html">EN</a></li>
     </ul>
 
 </div>
