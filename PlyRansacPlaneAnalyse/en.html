@@ -143,7 +143,7 @@ for {
             </header>
 
 
-            <p style=text-align:justify>Choose 3 points randomly to form a plane and compute the distance between 随机选取三个点并形成平面，计算上一步的子集中的所有点和此平面的距离，如果距离小于给定值则记为内点，否则记为外点。如果内点的数量达到一定比例，则认为此平面存在，放入验证组。如果没有达到此比例，则重新选择三个点并计算。如果达到一定迭代次数仍未找到拥有内点的数量达到一定比例的平面，则返回拥有内点数量最多的平面。</p>
+            <p style=text-align:justify>Choose 3 points randomly to form a plane and compute the distance between all each point in the batch and this plane. If a point is enough near to the plane (controlled by a given parameter that defines the distance), it will be considered as an inline point. If the proportion of inline points in the batch surpasses a a given line, that plane will be a considered as validated and fed to the next step, otherwise this step will be repeated. After a given number of repetitions, the plane which has the most inline points will be taken into next step if none of them surpassed the minimal limit of inline points. </p>
 
             <pre>
 <code class="language-go">// pick 3 vertices randomly
@@ -173,10 +173,10 @@ for {
             <p style=text-align:justify></p>
 
             <header>
-                <h3 style=text-align:justify>2.3 全局拟合</h3>
+                <h3 style=text-align:justify>2.3 General regression</h3>
             </header>
 
-            <p style=text-align:justify>计算上一步中得到的平面到所有点的距离，将小于给定距离的点记为全局内点，使用所有全局内点通过最小二乘法拟合一个新的平面，并将此平面放入平面池，同时将全局内点移出下次迭代使用的数据集。</p>
+            <p style=text-align:justify>In this step, we compute the distance between each point among the entire sample group and the plane obtained in the last step and get a group of general inline points using the same method and parameter. The general inline points will be removed from the samples for the next iteration. This plane will be put into a pool to be tested its redundancy. </p>
 
             <pre>
 <code class="language-go">// Fit several points to x plane, using the least square method by solving a linear system Ax=b
@@ -218,10 +218,10 @@ return P</code>
             <p style=text-align:justify></p>
 
             <header>
-                <h3 style=text-align:justify>2.4 重复检测</h3>
+                <h3 style=text-align:justify>2.4 Redundancy test</h3>
             </header>
 
-            <p style=text-align:justify>检测是否存在重复的平面。对于所有平面池内的平面，两两计算夹角，如夹角小于给定值，则视为平行，计算平面距离，如再小于给定值，则确认重复。使用两平面所有的内点以最小二乘法拟合出新的平面，替代两平面放入平面池。</p>
+            <p style=text-align:justify>In this step we will check if there are 2 redundant planes in the pool. For all planes in the pool, we calculate the angle formed by 2 planes. If the angle is smaller than the given value, the 2 planes will be considered parallel. For every 2 parallel planes, we test some point-to-plane distance between them. If the results are small enough, the 2 planes will be considered redundant. For 2 redundant planes, we mix their inline points and use the least square method to generate one common plane.</p>
 
             <pre>
 <code class="language-go">// check that if the new plane belongs to the same planar facade as one of the planes already obtained. If it is the case, mix the vertices and re-adjust the two planes using least square method
@@ -248,11 +248,11 @@ vlist = append(vlist[:0], vlist[0:len(vlist) - inlineCount]...)
             <p style=text-align:justify></p>
 
             <header>
-                <h3 style=text-align:justify>2.5 退出条件</h3>
+                <h3 style=text-align:justify>2.5 Exit condition</h3>
             </header>
 
 
-            <p style=text-align:justify>迭代以上所有步骤，直到迭代次数大于给定值或剩余外点数量小于给定值，返回平面数量，所有平面方程和剩余外点数量。</p>
+            <p style=text-align:justify>We iterate all these steps until the total times of iteration surpasses a given value, or the non-inline points left here are few enough. Then we will return the number of planes generated and their standard equations. </p>
 
             <pre>
 <code class="language-go">// decide whether the iteration continues
@@ -267,24 +267,24 @@ return planes, len(planes), verticesOfPlanes</code>
             <p style=text-align:justify></p>
 
             <header>
-                <h3 style=text-align:justify>2.6 参数</h3>
+                <h3 style=text-align:justify>2.6 Parameters</h3>
             </header>
 
-            <p style=text-align:justify>主要参数如下，需要根据点云的类型手动调整。</p>
+            <p style=text-align:justify>The main parameters are here below. They need to be adjusted according to the particualt .ply file that to be analysd. </p>
             <pre>
 <code class="language-go">func PlaneMonoConsecRANSAC32(
-	vlist []plyfile.VertexMono,	//所有的点（全集）
-	maxDistance float32, 		//平面与内点的最大距离
-	minScoreforRAN float32,		//平面的内点在子集中的最低比例
-	minVforPlane int,			//一个平面在全集中最低内点数量
-	maxAnglePlanes float32,		//平行平面的最大夹角
-	maxVtoQuit int,				//程序结束时不属于任何平面的点的最大数量
-	iterMax int,				//程序结束前的最多迭代次数
-	volumeBatch int 			//构成子集的点的数量
+	vlist []plyfile.VertexMono,	// the slice which contains all the points fetched from a .ply file
+	maxDistance float32, 		// maximal distance between a inline point and its plane
+	minScoreforRAN float32,		// the minimal proportion of inline points that a plane need to have in a batch to be considered as validated
+	minVforPlane int,			// the minimal number of inline points that a plane need to have among all points to be considered as validated
+	maxAnglePlanes float32,		// maximal angle between 2 planes that to be considered as parallel
+	maxVtoQuit int,				// exit condition : the maximal number of points which are not considered inline fot any plane
+	iterMax int,				// exit condition : the maximal number of iterations
+	volumeBatch int 			// the size of batch
 	) ([]Plane32, int, [][]plyfile.VertexMono)</code>
 </pre>
             <p style=text-align:justify></p>
-            <p style=text-align:justify>例如 ：</p>
+            <p style=text-align:justify>Example of usage ：</p>
 
             <pre>
 <code class="language-go">Planes, numPlanes, _ := calculator.PlaneMonoConsecRANSAC32(vlist, 0.003,
@@ -306,16 +306,16 @@ return planes, len(planes), verticesOfPlanes</code>
         <div class="container">
 
             <header>
-                <h2>3. 数据读取</h2>
+                <h2>3. Data reading</h2>
             </header>
 
-            <p style=text-align:justify;>在准备数据的读取程序时，我们发现，现有使用Golang的.ply点云读取算法是基于cgo的，使用的时调用c语言库进行编译，在代码可读性，和易用性上作的都不是很好。语言间的互相调用也会损失性能，编写和使用方式都非常不优雅。于是我决定开发原生基于Golang的.ply点云读取程序。</p >
+            <p style=text-align:justify;>As we started preparing for something that reads the data, we discovered that only existing .ply reader in Golang is based on cgo, which calls functions in an external c++ library. The code of this package is not easy to use nor easy to understand. What's more, function calls to a c++ library may undermine significantly the performance. Thus, we decide to develop a .ply reader based on native Golang. 。</p >
 
             <header>
-                <h3 style=text-align:justify>3.1 语法分析</h3>
+                <h3 style=text-align:justify>3.1 Parsing header</h3>
             </header>
 
-            <p style=text-align:justify;>语法分析的作用主要在于从headers头文件提取有用的信息，例如二进制编码方式，点的数量，点的数据构成和数据类型，面的数量等等。这里的语法分析器可以识别任意构成的头文件，只要其遵循基本.ply文件的headers的语法。语法分析的核心代码如下。</p >
+            <p style=text-align:justify;>First, we will want to </p >
 
             <pre >
 <code class="language-go">for _, i := range lines {
@@ -387,13 +387,13 @@ return planes, len(planes), verticesOfPlanes</code>
             <p style=text-align:justify></p>
 
             <header>
-                <h3 style=text-align:justify>3.2 文件读取</h3>
+                <h3 style=text-align:justify>3.2 Reading </h3>
             </header>
 
 
 
 
-            <p style=text-align:justify;>众所周知，.ply文件存在两种编码方式，即ASCII与二进制。前者可以直接作为数字被读取，而后者需要经过解码函数作为二进制输出。由于目标文件的编码方式为二进制，这里只开发了二进制的读取和写入功能。</p >
+            <p style=text-align:justify;>Generally, there exits 2 ways of encoding for .ply files : ASCII and binary. The former can be read directly while the latter needs to be decoded through a particular procedure. Since files obtained by a Intel device are always encoded in binary mode, this will be the only mode support by our file reader.</p >
 
             <pre>
 		<code class="language-go">if name == "vertex" {
@@ -417,7 +417,7 @@ return planes, len(planes), verticesOfPlanes</code>
 		</pre>
             <p style=text-align:justify></p>
 
-            <p style=text-align:justify;>对于读入的每组数据，根据二进制编码方式（Little / Big Endian）进行解码。</p >
+            <p style=text-align:justify;>For each triple of 3d coordinates, decode according to the proper coding method (Little / Big Endian).</p >
             <pre>
 		<code class="language-go">func PlyGetElement(plyfile *PlyFile, element interface{}, size uintptr) {
 	switch plyfile.file_type {
@@ -438,19 +438,21 @@ return planes, len(planes), verticesOfPlanes</code>
 
             <p style=text-align:justify></p>
 
-            <p style=text-align:justify;>程序最终输出一个由顶点构成的切片（数组）和一个由面构成的切片。</p >
+            <p style=text-align:justify;>A slice containing all the vertices (points) and another for the faces (composed by 3 points) will be returned at the end.</p >
 
             <p style=text-align:justify></p>
 
             <header>
-                <h3 style=text-align:justify>3.3 初步测试和性能优化</h3>
+                <h3 style=text-align:justify>3.3 A first benchmark and optimization</h3>
             </header>
 
-            <p style=text-align:justify;>使用pprof对整个程序进行profiling，我们发现数据读取函数（下图右方的黄色部分）占用了近1/3的总时长，然而这部分代码并没有大量的计算。进一步分析代码，发现程序对与每个点或面的元素都调用了一次解码函数并从硬盘存储设备中读取数据，由于硬盘与处理器之间的bus通信延迟较长，从而产生了大量的无效等待时间。</p >
+            <p style=text-align:justify;>We use pprof to profile the entire program (reading the data and then analyzing). We discovered that reading the data (on the right side here above, the bar plot in yellow) counted for about 1/3 of total time spent, whether there is no massive computation in the code. </p >
+
+            <p style=text-align:justify>After having a further analyze on the code, we found that the reader function make a data transferring for each single point in the .ply file, which means that a huge amount of time is wasted on the communication between the processor and the hard disk, whose delay is considerable.</p>
 
             <a href="#" class="image featured"><img src="images/1.png" alt="" /></a>
             <p style=text-align:justify></p>
-            <p style=text-align:justify>于是考虑减少从存储设备中读取数据的次数。在新版本中，尝试只调用一次读取函数，读取所有数据至内存，然后再调用解码函数。由于内存与处理器间的通信延迟远低于硬盘，可以节省大量等待时间，预计可以获得较大的性能提升。使用下面的代码重新构造读取函数。</p>
+            <p style=text-align:justify>Therefore, we consider to reduce the communication with the hard disk. We consider to read all data to memory in one function call, then we can manipulate the data directly from the memory, which has far smaller delay than the hard disk. In this way, a remarkable improvement on the performance is waited. We use the code here below to rebuild the data reading function.</p>
 
 
             <pre>
@@ -474,7 +476,7 @@ return planes, len(planes), verticesOfPlanes</code>
 		</pre>
             <p style=text-align:justify></p>
 
-            <p style=text-align:justify>可以看到，使用新的读取函数后，读取数据所占用的时间比例明显降低，整体速度从2,74s提升至1,92s，在没有优化计算部分的情况下获得了42,71%的性能提升。</p>
+            <p style=text-align:justify>We can observe that, with the new reading function, the proportion of time spent by it in reduced to 1.92s from 2.74s. A speedup of 1.43 is achieved even without any optimization or parallelization the computing side. </p>
 
             <a href="#" class="image featured"><img src="images/2.png" alt="" /></a>
         </div>
@@ -485,16 +487,16 @@ return planes, len(planes), verticesOfPlanes</code>
         <div class="container">
 
             <header>
-                <h2>4. 基准测试</h2>
+                <h2>4. Benchmark</h2>
             </header>
 
-            <p style=text-align:justify;>基准测试包含了文件读取部分和数据处理部分，应计划要求，在最后加入了文件压缩函数，使用Golang自带的gzip库进行压缩工作。详细结果如下，经过测试，发现使用3作为压缩比参数能达到最理想的性能（压缩比 / 时间）。</p >
+            <p style=text-align:justify;>The benchmark here includes the file reading function together with the data processing function. According to the demand of the project, a function which compress the data. Here we use the internal package of Golang, gzip, to do the compression. The detailed result is here below. We observe that use 3 as the compression parameter can lead to a best size/time ratio. </p >
 
             <a href="#" class="image featured"><img src="images/3.png" alt="" /></a>
 
             <p style=text-align:justify;></p >
 
-            <p style=text-align:justify;>在章节3.3中，通过对数据读取函数的优化，我们有效地提高了函数的运行效率。这里，我们使用qemu模拟了在arm1176处理器上运行的Raspberry虚拟机，探究在较低性能的ARM处理器下该优化可能获得的性能提升。可以看到，在低性能环境下，通过这种方式获得的性能提升可能会更加可观。</p >
+            <p style=text-align:justify;> In chapter 3.3, we improved the performance of our data reader function by reducing the access to the hard disk. Here we repeat the similar benchmark on a virtual machine of Raspberry Pi, whose virtual processor is arm1176. This is to study the gain of performance on a platform of a lower computational power. We can see that in such situation, we may have a even higher rate of performance improvement.</p >
 
             <a href="#" class="image featured"><img src="images/4.png" alt="" /></a>
 
@@ -508,10 +510,12 @@ return planes, len(planes), verticesOfPlanes</code>
         <div class="container">
 
             <header>
-                <h2>5.并发优化</h2>
+                <h2>5. Concurrency</h2>
             </header>
 
-            <p style=text-align:justify;>考虑以下场景：数据输入端持续采集并保存数据，由于采集速度远大于数据分析速度，容易处理不完，造成堆积。对于每个点云文件的分析是独立的进程，并不依赖于其它文件，因此在理想状态下可以完美并行化（Amdahl’s Law）。在实际应用中，体现为可以方便地并行处理每个文件，获得性能提升。</p >
+            <p style=text-align:justify;>Considering a such scenario : a file reader is feeding data in .ply files continuously. Since the speed of processing a file is lower than that of collecting that file, files will accumulate and form a huge mountain of unprocessed data. </p >
+
+            <p style=text-align:justify;>Meanwhile, the procedure of processing each piece of data is independent one from another. Thus, theoretically, this can be perfectly parallelized according to Amdahl's Law. </p >
 
             <pre>
 		<code class="language-go">if modeProc == 2 {
@@ -548,9 +552,9 @@ wg.Wait()</code>
 		</pre>
             <p style=text-align:justify;></p >
 
-            <p style=text-align:justify;>这里使用goroutines进行并发计算，不限制最大的goroutines数量，和waitgroup进行线程同步。在与前文相同的x86平台上进行了基准测试以比较和普通模式下的性能差异。使用相同的处理、压缩参数和数据文件，普通模式下耗时9.186s，并发模式耗时3.860s，加速比约为2,380.</p >
+            <p style=text-align:justify;>We use goroutines add concurrency to the computation. we lance a goroutine for each .ply file found, without a imposing a limit of the maximal existing goroutines. Another benchmark is done on the x86 platform. With the identical parameters and data, it takes 9.186s to complete the iterations without goroutines concurrency and 3.860s within. The speedup gained by adding the concurrency is about 2.380</p >
 
-            <p style=text-align:justify;>在其他的优化方面，尝试了将全局浮点数类型从64位改为32位以观察在32位Raspberry设备上的性能表现，性能差异极小，怀疑可能是误差。用快速平方根算法替代goNum库内的平方根算法，造成性能损失，也被放弃。</p >
+            <p style=text-align:justify;>As for other optimizations, we tried to replace all 64-bit floats with 32-bit floats, since the ARM architecture on the Raspberry system is based on 32 bits. However, the influence on performance is barely visible. We also tried to replace the square root function of goNum package with a self-made one using the fast square root algorithm, while the gain on performance is even negative. </p >
 
 
         </div>
@@ -562,12 +566,12 @@ wg.Wait()</code>
         <div class="container">
 
             <header>
-                <h2>6. 后续工作</h2>
+                <h2>6. Future work</h2>
             </header>
 
-            <p style=text-align:justify;>RANSAC算法简单易用，便于理解，但是也有其局限性。计算结果在很大程度上依赖于参数的选择和随机选择的数据点的质量，对于单个场景需要重复计算来获得一个收敛于均值的结果。此外，对于复杂场景的处理能力不佳，需要反复调整参数。</p >
+            <p style=text-align:justify;>RANSAC is a simple algorithm, easy to use and to implement, while it has some defaults. First, quality of the result depends on the samples which are chosen randomly. To eliminate the influence of that randomisity, we tend to do more iterations, which undermines the performance. When the structure of the cloud point file is complicated, time needed to achieve a satisfactory result increases rapidly. What's more, there is too many parameters to be set manually which makes it difficult to use. </p >
 
-            <p style=text-align:justify;>可以考虑引入其他算法构建结合体，例如区域增长或平均法向量分析。建议参考OpenCV中类似算法的设计。</p >
+            <p style=text-align:justify;>We think about the possibility to introduce other algorithms such as region-growth or average normal vector estimation. </p >
 
         </div>
     </section>
@@ -578,7 +582,7 @@ wg.Wait()</code>
 
 
             <header>
-                <h2>7. 参考文献</h2>
+                <h2>7. References</h2>
             </header>
 
             <p style=text-align:justify;><a href="https://halshs.archives-ouvertes.fr/halshs-00264839/document">https://halshs.archives-ouvertes.fr/halshs-00264839/document</a> Automatic segmentation of building facades using Terrestrial Laser Data</p >

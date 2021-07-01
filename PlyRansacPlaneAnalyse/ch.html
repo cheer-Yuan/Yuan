@@ -548,7 +548,7 @@ wg.Wait()</code>
 </pre>
 						<p style=text-align:justify;></p >
 
-						<p style=text-align:justify;>这里使用goroutines进行并发计算，不限制最大的goroutines数量，和waitgroup进行线程同步。在与前文相同的x86平台上进行了基准测试以比较和普通模式下的性能差异。使用相同的处理、压缩参数和数据文件，普通模式下耗时9.186s，并发模式耗时3.860s，加速比约为2,380.</p >
+						<p style=text-align:justify;>这里使用goroutines进行并发计算，和waitgroup进行线程同步，不限制最大的goroutines数量。在与前文相同的x86平台上进行了基准测试以比较和普通模式下的性能差异。使用相同的处理、压缩参数和数据文件，普通模式下耗时9.186s，并发模式耗时3.860s，加速比约为2,380.</p >
 
 						<p style=text-align:justify;>关于其他方面的优化，我们尝试了将全局浮点数类型从64位改为32位并测试在32位Raspberry设备上的性能表现，在运行时间上的差异极小，怀疑是误差。此外，用快速平方根算法替代goNum库内的平方根算法，结果造成了性能损失，也被放弃。</p >
 
